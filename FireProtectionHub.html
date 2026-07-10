@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WSRB GIS Data Hub</title>
+
+  <!-- ArcGIS Maps SDK 5.0 -->
+  <script type="module" src="https://js.arcgis.com/5.0/"></script>
+
+  <style>
+    html, body, #map-view { height: 100%; margin: 0; padding: 0; }
+
+    .map-header-box {
+      position: absolute; top: 12px;
+      background: rgba(30,30,35,0.9); color: #e2e0d8;
+      padding: 8px 20px; border-radius: 8px; font-size: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      z-index: 10; pointer-events: none; white-space: nowrap;
+    }
+    #header-org-name {
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+    }
+    #header-org-name span { color: #9fe1cb; font-weight: 500; }
+    #header-user { top: 60px; right: 12px; display: none; }
+    #header-user span { color: #9fe1cb; font-weight: 500; }
+
+    /* Shown while OAuth redirect / app init is in progress */
+    #loading-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15,15,18,0.97);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #888780; font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-overlay">Signing in...</div>
+
+<div id="header-org-name" class="map-header-box">
+  <span id="org-name"></span>
+</div>
+
+<div id="header-user" class="map-header-box">
+  Logged in as: <span id="org-user"></span>
+</div>
+
+<arcgis-map id="map-view" basemap="topo-vector" zoom="7" center="-120.5,47.5" popup-component-enabled>
+
+  <!-- Top-left stack, matching standard Portal web map layout:
+       Home, Basemap gallery, Legend/Layer list, Zoom -->
+  <arcgis-home slot="top-left"></arcgis-home>
+
+  <arcgis-expand slot="top-left" expand-icon="basemap" expand-tooltip="Basemaps" auto-collapse>
+    <arcgis-basemap-gallery></arcgis-basemap-gallery>
+  </arcgis-expand>
+
+  <arcgis-expand slot="top-left" expand-icon="layers" expand-tooltip="Layers">
+    <arcgis-layer-list></arcgis-layer-list>
+  </arcgis-expand>
+
+  <arcgis-expand slot="top-left" expand-icon="legend" expand-tooltip="Legend" auto-collapse>
+    <arcgis-legend></arcgis-legend>
+  </arcgis-expand>
+
+  <arcgis-zoom slot="top-left"></arcgis-zoom>
+
+  <!-- Search: top-right -->
+  <arcgis-search slot="top-right"></arcgis-search>
+
+  <!-- Scale bar: bottom-left -->
+  <arcgis-scale-bar slot="bottom-left" unit="dual"></arcgis-scale-bar>
+
+</arcgis-map>
+
+<script type="module">
+
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+
+const PORTAL_URL      = "https://gisent-qa.wsrb.com/arcgis";
+const APP_ID          = "oGxx7MfUYUQcF0c5";
+
+const FPD_LAYER_URL        = "https://gisent-qa-ds.wsrb.com:6443/arcgis/rest/services/Hosted/FPD_Hub/FeatureServer/0";
+const FIRE_PROTECTION_URL  = "https://gisent-qa-ds.wsrb.com:6443/arcgis/rest/services/Hosted/FireProtection_FP/FeatureServer/0";
+const HYDRANT_BUF_URL      = "https://gisent-qa-ds.wsrb.com:6443/arcgis/rest/services/Hosted/HydrantBuffer1000ft_FP/FeatureServer/0";
+const STATIONS_URL         = "https://gisent-qa-ds.wsrb.com:6443/arcgis/rest/services/Hosted/FireStations_FP/FeatureServer/0";
+const DRIVE_MILE_URL       = "https://gisent-qa-ds.wsrb.com:6443/arcgis/rest/services/Hosted/DriveMile_FP/FeatureServer/0";
+
+// User → agency lookup table (hosted table, no geometry)
+const LOOKUP_TABLE_URL = "https://gisent-qa-ds.wsrb.com:6443/arcgis/rest/services/Hosted/FPD_UserLookup/FeatureServer/0";
+
+// SQL-safe quoting for fire_prote values (handles apostrophes in names)
+const sqlQuote = s => `'${s.replace(/'/g, "''")}'`;
+
+// ---------------------------------------------------------------------------
+// Proper Case helper
+// ---------------------------------------------------------------------------
+
+const LOWERCASE_EX = new Set([
+  "a","an","and","at","but","by","for","in","nor",
+  "of","on","or","so","the","to","up","yet",
+]);
+const UPPERCASE_EX = new Set([
+  "ii","iii","iv","vi","vii","viii","ix",
+  "ne","nw","se","sw","us","sr","wa",
+  "llc","inc","ltd","lp","llp","f.p.d.","f.p.d",
+]);
+
+function properCase(str) {
+  if (!str) return str;
+  const words = str.toLowerCase().split(" ");
+  const result = words.map((word, i) => {
+    if (!word) return word;
+    if (UPPERCASE_EX.has(word)) return word.toUpperCase();
+    if (i > 0 && LOWERCASE_EX.has(word)) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  });
+  const last = result.length - 1;
+  if (result[last]) result[last] = result[last].charAt(0).toUpperCase() + result[last].slice(1);
+  return result.join(" ");
+}
+
+// ---------------------------------------------------------------------------
+// Arcade proper-case function -- shared across popup expressions.
+// Each call site appends its own exceptions list and target field.
+// ---------------------------------------------------------------------------
+
+const ARCADE_PROPER_FN = `
+function ProperWithExceptions(s, ex) {
+  if (IsEmpty(s)) return s
+  var words = Split(s, ' ')
+  var out = []
+  for (var i in words) {
+    var w = words[i]
+    var up = Upper(w)
+    var found = false
+    for (var j in ex) {
+      if (up == Upper(ex[j])) { Push(out, ex[j]); found = true; break }
+    }
+    if (!found) {
+      var p = Proper(w)
+      var fc = Left(w, 1)
+      if (fc >= '0' && fc <= '9' &&
+         (Right(up,2)=='ST'||Right(up,2)=='ND'||Right(up,2)=='RD'||Right(up,2)=='TH')) {
+        p = Left(p, Count(p)-2) + Lower(Right(w,2))
+      }
+      Push(out, p)
+    }
+  }
+  return Concatenate(out, ' ')
+}`;
+
+const ARCADE_DISTRICT_EX = `var ex = ['FPD','F.P.D.','EMS','RFA','NO.',
+          'NE','NW','SE','SW','N','S','E','W',
+          'US','SR','WA','LLC','INC','LTD','LP','LLP']`;
+
+const ARCADE_ADDRESS_EX = `var ex = ['NE','NW','SE','SW','N','S','E','W','US','SR','WA',
+          'PO','PMB','APT','STE','BLDG','FL','RM','LLC','INC','LTD','LP','LLP']`;
+
+// ---------------------------------------------------------------------------
+// Popup table row helper
+// ---------------------------------------------------------------------------
+
+const TD_L = "padding:5px 8px;background:#e8f4f8;font-weight:bold;border:1px solid #ccc;white-space:nowrap";
+const TD_V = "padding:5px 8px;border:1px solid #ccc";
+const popupRow = (label, val) =>
+  `<tr><td style='${TD_L}'>${label}</td><td style='${TD_V}'>${val}</td></tr>`;
+const popupTable = (...rows) =>
+  "<table style='border-collapse:collapse;width:100%;font-family:Arial;font-size:13px'>" +
+  rows.join("") + "</table>";
+
+const [
+  FeatureLayer,
+  LabelClass,
+  Polygon,
+  Graphic,
+  unionOperator,
+  geometryEngine,
+  esriId,
+  OAuthInfo,
+] = await $arcgis.import([
+  "@arcgis/core/layers/FeatureLayer.js",
+  "@arcgis/core/layers/support/LabelClass.js",
+  "@arcgis/core/geometry/Polygon.js",
+  "@arcgis/core/Graphic.js",
+  "@arcgis/core/geometry/operators/unionOperator.js",
+  "@arcgis/core/geometry/geometryEngine.js",
+  "@arcgis/core/identity/IdentityManager.js",
+  "@arcgis/core/identity/OAuthInfo.js",
+]);
+
+// ---------------------------------------------------------------------------
+// OAuth setup -- redirect flow (no popup)
+// ---------------------------------------------------------------------------
+
+const oauthInfo = new OAuthInfo({
+  appId:     APP_ID,
+  portalUrl: PORTAL_URL,
+  popup:     false,
+});
+esriId.registerOAuthInfos([oauthInfo]);
+
+// Module-scoped credential -- set in startApp, used by raw fetch calls
+let credential;
+
+// Module-scoped map references -- set in initMap
+let fpdLayer, fireProtectionLayer, hydrantBufLayer, stationsLayer, autoAidStationsLayer, driveMileLayer, countiesLayer, parcelsLayer, view;
+
+// ---------------------------------------------------------------------------
+// User lookup -- maps Portal userId to fire_prote via lightweight hosted table
+// ---------------------------------------------------------------------------
+
+async function lookupAgency(userId) {
+  const params = new URLSearchParams({
+    where:          `portal_user = '${userId}'`,
+    outFields:      "fire_prote",
+    returnGeometry: false,
+    f:              "json",
+    token:          credential.token,
+  });
+  const resp = await fetch(`${LOOKUP_TABLE_URL}/query?${params}`);
+  const json = await resp.json();
+  if (json.error) throw new Error(`Lookup query: ${json.error.message}`);
+  if (!json.features?.length) throw new Error(`No agency found for user: ${userId}`);
+  return json.features[0].attributes.fire_prote;
+}
+
+// ---------------------------------------------------------------------------
+// FPD info query -- returns geometry + fpd_codes for a given fire agency
+// ---------------------------------------------------------------------------
+
+async function getFPDInfo(fireProt) {
+  const params = new URLSearchParams({
+    where:          `fire_prote = ${sqlQuote(fireProt)}`,
+    returnGeometry: true,
+    outSR:          102100,
+    outFields:      "fire_prote,fpd_code,fdid",
+    f:              "json",
+    token:          credential.token,
+  });
+  const resp = await fetch(`${FPD_LAYER_URL}/query?${params}`);
+  const json = await resp.json();
+  if (json.error) throw new Error(`FPD query: ${json.error.message}`);
+  if (!json.features?.length) throw new Error(`No FPD found for: ${fireProt}`);
+
+  const fpdCodes  = [...new Set(json.features
+    .map(f => f.attributes.fpd_code)
+    .filter(Boolean))];
+  const fdids     = [...new Set(json.features
+    .map(f => f.attributes.fdid)
+    .filter(Boolean))];
+  const fdid      = fdids.join("/");  // handles multi-FPD agencies
+
+  const geometries = json.features.map(f => new Polygon({
+    rings:            f.geometry.rings,
+    spatialReference: { wkid: 102100 },
+  }));
+  const geometry = geometries.length === 1
+    ? geometries[0]
+    : unionOperator.executeMany(geometries);
+
+  return { geometry, fpdCodes, fdid };
+}
+
+// ---------------------------------------------------------------------------
+// UI helpers
+// ---------------------------------------------------------------------------
+
+function updateLabel(fireProt) {
+  document.getElementById("org-name").textContent = properCase(fireProt);
+  document.getElementById("org-user").textContent = credential.userId;
+}
+
+function zoomToLayer(layer, view) {
+  layer.when()
+    .then(() => layer.queryExtent({ where: layer.definitionExpression || "1=1" }))
+    .then(result => { if (result?.extent) view.goTo(result.extent.expand(1.5)); })
+    .catch(err => console.warn("zoomToLayer failed:", err));
+}
+
+// ---------------------------------------------------------------------------
+// Drive mile definition expression -- OR across DIST1-DIST24 for all user FPD codes
+// Handles single-FPD and multi-FPD (RFA/ILA) agencies, and auto-aid coverage
+// ---------------------------------------------------------------------------
+
+function buildDriveMileExpression(fpdCodes) {
+  const quoted = fpdCodes.map(c => `'${c}'`).join(",");
+  const inClause = fpdCodes.length === 1
+    ? `= ${quoted}`
+    : `IN (${quoted})`;
+  return Array.from({ length: 24 }, (_, i) => `dist${i + 1} ${inClause}`).join(" OR ");
+}
+
+// ---------------------------------------------------------------------------
+// Hydrant buffer layer builder -- fetches buffers intersecting the FPD,
+// clips each to the boundary geometry, returns a source-based FeatureLayer.
+// Buffers are a visual coverage indicator; popup disabled for cleanliness.
+// ---------------------------------------------------------------------------
+
+async function buildHydrantLayer(fpdGeometry) {
+  
+  const idsResp = await fetch(`${HYDRANT_BUF_URL}/query`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      where:          "1=1",
+      geometry:       JSON.stringify(fpdGeometry),
+      geometryType:   "esriGeometryPolygon",
+      spatialRel:     "esriSpatialRelIntersects",
+      inSR:           102100,
+      returnGeometry: false,
+      returnIdsOnly:  true,
+      f:              "json",
+      token:          credential.token,
+    }),
+  });
+  const idsJson = await idsResp.json();
+  if (idsJson.error) throw new Error(`Hydrant ID query: ${idsJson.error.message}`);
+
+  const ids = idsJson.objectIds || [];
+  console.log(`Hydrant: ${ids.length} buffers intersect FPD`);
+  if (ids.length === 0) return null;
+
+  
+  const featResp = await fetch(`${HYDRANT_BUF_URL}/query`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      where:          `objectid IN (${ids.join(",")})`,
+      outFields:      "objectid",
+      returnGeometry: true,
+      outSR:          102100,
+      f:              "json",
+      token:          credential.token,
+    }),
+  });
+  const featJson = await featResp.json();
+  if (featJson.error) throw new Error(`Hydrant geometry query: ${featJson.error.message}`);
+
+  
+  const graphics = featJson.features
+    .map(f => {
+      const poly = new Polygon({
+        rings:            f.geometry.rings,
+        spatialReference: { wkid: 102100 },
+      });
+      const clipped = geometryEngine.intersect(poly, fpdGeometry);
+      if (!clipped) return null;
+      return new Graphic({ geometry: clipped, attributes: f.attributes });
+    })
+    .filter(Boolean);
+
+  console.log(`Hydrant: ${graphics.length} buffers after clipping`);
+
+  return new FeatureLayer({
+    title:           "Hydrant Buffer (1000 ft)",
+    source:          graphics,
+    objectIdField:   "objectid",
+    geometryType:    "polygon",
+    spatialReference: { wkid: 102100 },
+    fields:          [{ name: "objectid", type: "oid" }],
+    minScale:        150000,
+    opacity:         0.32,
+    popupEnabled:    false,
+    renderer: {
+      type:   "simple",
+      symbol: {
+        type:    "simple-fill",
+        color:   [197, 225, 240],
+        outline: { color: [0, 40, 100], width: 2 },
+      },
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Drive mile layer builder -- fetches disks that respond to this FPD,
+// clips each disk geometry to the FPD boundary using intersectOperator,
+// and returns a source-based FeatureLayer. This ensures auto-aid coverage
+// only appears where it is relevant inside the district boundary.
+// ---------------------------------------------------------------------------
+
+const DRIVE_MILE_RENDERER = {
+  type:  "unique-value",
+  field: "tobreak",
+  uniqueValueInfos: [
+    {
+      value: 1.5, label: "1.5 mi",
+      symbol: { type: "simple-fill", color: [237, 81, 81],
+                outline: { color: [255, 255, 255], width: 0.5 } },
+    },
+    {
+      value: 2.5, label: "2.5 mi",
+      symbol: { type: "simple-fill", color: [20, 158, 206],
+                outline: { color: [255, 255, 255], width: 0.5 } },
+    },
+    {
+      value: 5, label: "5 mi",
+      symbol: { type: "simple-fill", color: [148, 103, 189],
+                outline: { color: [255, 255, 255], width: 0.5 } },
+    },
+    {
+      value: 7, label: "7 mi",
+      symbol: { type: "simple-fill", color: [240, 150, 50],
+                outline: { color: [255, 255, 255], width: 0.5 } },
+    },
+  ],
+};
+
+const DRIVE_MILE_POPUP = {
+  title:   "{stationname} — {tobreak} mi disk",
+  content: [{ type: "fields", fieldInfos: [
+    { fieldName: "stationname", label: "Station" },
+    { fieldName: "dist1",       label: "Primary FPD" },
+    { fieldName: "tobreak",     label: "Disk radius (mi)" },
+    { fieldName: "stntype",     label: "Station type" },
+  ]}],
+};
+
+const DRIVE_MILE_FIELDS = [
+  { name: "objectid",    type: "oid"    },
+  { name: "station",     type: "string" },
+  { name: "dist1",       type: "string" },
+  { name: "stationname", type: "string" },
+  { name: "frombreak",   type: "double" },
+  { name: "tobreak",     type: "double" },
+  { name: "stntype",     type: "string" },
+];
+
+async function buildDriveMileLayer(fpdGeometry, fpdCodes) {
+  
+  
+  
+  const idsResp = await fetch(`${DRIVE_MILE_URL}/query`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      where:          "stntype IN ('A', 'B')",
+      geometry:       JSON.stringify(fpdGeometry),
+      geometryType:   "esriGeometryPolygon",
+      spatialRel:     "esriSpatialRelIntersects",
+      inSR:           102100,
+      returnGeometry: false,
+      returnIdsOnly:  true,
+      f:              "json",
+      token:          credential.token,
+    }),
+  });
+  const idsJson = await idsResp.json();
+  if (idsJson.error) throw new Error(`Drive mile ID query: ${idsJson.error.message}`);
+
+  const ids = idsJson.objectIds || [];
+  console.log(`Drive mile: ${ids.length} disks intersect FPD`);
+  if (ids.length === 0) return null;
+
+  const featResp = await fetch(`${DRIVE_MILE_URL}/query`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      where:          `objectid IN (${ids.join(",")})`,
+      outFields:      "objectid,station,dist1,stationname,frombreak,tobreak,stntype",
+      returnGeometry: true,
+      outSR:          102100,
+      f:              "json",
+      token:          credential.token,
+    }),
+  });
+  const featJson = await featResp.json();
+  if (featJson.error) throw new Error(`Drive mile geometry query: ${featJson.error.message}`);
+
+  
+  
+  
+  const graphics = featJson.features
+    .map(f => {
+      const disk = new Polygon({
+        rings:            f.geometry.rings,
+        spatialReference: { wkid: 102100 },
+      });
+      const clipped = geometryEngine.contains(fpdGeometry, disk)
+        ? disk
+        : geometryEngine.intersect(disk, fpdGeometry);
+      if (!clipped) return null;
+      return new Graphic({ geometry: clipped, attributes: f.attributes });
+    })
+    .filter(Boolean);
+
+  console.log(`Drive mile: ${graphics.length} disks after clipping`);
+
+  
+  const layer = new FeatureLayer({
+    title:           "Drive Mile Coverage",
+    source:          graphics,
+    objectIdField:   "objectid",
+    geometryType:    "polygon",
+    spatialReference: { wkid: 102100 },
+    fields:          DRIVE_MILE_FIELDS,
+    opacity:         0.35,
+    orderBy:         [{ field: "tobreak", order: "ascending" }],  // small tobreak (1.5mi) drawn on top
+    renderer:        DRIVE_MILE_RENDERER,
+    popupEnabled:    false,
+  });
+
+  return layer;
+}
+
+// ---------------------------------------------------------------------------
+// Station layer shared config
+// ---------------------------------------------------------------------------
+
+const STATION_LABEL_CLASS = (size = 13) => new LabelClass({
+  labelExpressionInfo: {
+    expression: `$feature["stationname"] + " (" + $feature["station"] + ")"`,
+  },
+  symbol: {
+    type:      "text",
+    color:     [80, 80, 80],
+    haloColor: [255, 255, 255],
+    haloSize:  1,
+    font:      { family: "Arial", style: "normal", weight: "normal", size },
+    xoffset:   -8,
+    yoffset:   11,
+  },
+  labelPlacement: "center-right",
+});
+
+const STATION_POPUP = {
+  title: "{stationname} ({station})",
+  expressionInfos: [{
+    name: "dist-list",
+    expression: `
+      var dists = []
+      var d = ''
+      d = $feature.dist2;  if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist3;  if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist4;  if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist5;  if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist6;  if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist7;  if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist8;  if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist9;  if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist10; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist11; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist12; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist13; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist14; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist15; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist16; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist17; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist18; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist19; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist20; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist21; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist22; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist23; if (!IsEmpty(d) && d != '') Push(dists, d)
+      d = $feature.dist24; if (!IsEmpty(d) && d != '') Push(dists, d)
+      if (Count(dists) == 0) return 'None'
+      return Concatenate(dists, ', ')
+    `,
+  }],
+  content: [{
+    type: "text",
+    text: popupTable(
+      popupRow("Station Name", "{stationname}"),
+      popupRow("Station Code", "{station}"),
+      popupRow("Type", "{stntype}"),
+      popupRow("Address", "{stationaddress}"),
+      popupRow("Auto Aid (DIST2-24)", "{expression/dist-list}"),
+    ),
+  }],
+};
+
+const FIRE_AGENCY_POPUP = {
+  title: "{expression/district-proper}: {stationname}",
+  expressionInfos: [{
+    name: "district-proper",
+    expression: `${ARCADE_PROPER_FN}\n${ARCADE_DISTRICT_EX}\nreturn ProperWithExceptions($feature.fire_district, ex)`,
+  }],
+  content: [{
+    type: "text",
+    text: popupTable(
+      popupRow("Station Name", "{stationname}"),
+      popupRow("Type", "{stntype}"),
+      popupRow("Address", "{stationaddress}"),
+      popupRow("Fire District", "{expression/district-proper}"),
+    ),
+  }],
+};
+const STATION_RENDERER = {
+  type:   "simple",
+  symbol: {
+    type:      "web-style",
+    name:      "fire-station",
+    styleName: "Esri2DPointSymbolsStyle",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Map initialisation
+// ---------------------------------------------------------------------------
+
+async function initMap(fireProt, fpdGeometry, fpdCodes, fdid) {
+  const labelSize = Math.round(14 / (window.devicePixelRatio || 1));
+  const fireProtWhere = `fire_prote = ${sqlQuote(fireProt)}`;
+
+  fireProtectionLayer = new FeatureLayer({
+    url:                  FIRE_PROTECTION_URL,
+    title:                "Fire Agency Boundary",
+    definitionExpression: fireProtWhere,
+    outFields:            ["*"],
+    renderer: {
+      type:   "simple",
+      symbol: {
+        type:    "simple-fill",
+        color:   [0, 0, 0, 0],
+        outline: { color: [139, 0, 0], width: 3 },
+      },
+    },
+    popupEnabled: false,
+  });
+
+  fpdLayer = new FeatureLayer({
+    url:                  FPD_LAYER_URL,
+    title:                "FPD Boundary",
+    definitionExpression: fireProtWhere,
+    outFields:            ["*"],
+    labelsVisible:        true,
+    labelingInfo: [new LabelClass({
+      labelExpressionInfo: {
+        expression: `$feature.fpd_desc`,
+      },
+      symbol: {
+        type:      "text",
+        color:     [168, 0, 0, 199],
+        haloColor: [252, 250, 250],
+        haloSize:  2,
+        font:      { family: "Roboto", weight: "bold", size: labelSize },
+      },
+      labelPlacement: "always-horizontal",
+    })],
+    renderer: {
+      type:   "simple",
+      symbol: {
+        type:    "simple-fill",
+        color:   [139, 0, 0, 0.06],
+        outline: { color: [139, 0, 0], width: 1.5 },
+      },
+    },
+    popupEnabled: false,
+  });
+
+  // Simplify FPD geometry for client-side clipping operations (drive miles,
+  // hydrant buffers). Reduces vertex count on complex boundaries like Spokane
+  // without affecting the rendered boundary layers which use server-side queries.
+  const fpdGeometryClip = geometryEngine.generalize(fpdGeometry, 50, true, "meters");
+
+  // Hydrant buffer layer -- off by default
+  hydrantBufLayer = await buildHydrantLayer(fpdGeometryClip);
+  if (hydrantBufLayer) hydrantBufLayer.visible = false;
+
+  // Drive mile layer -- clipped client-side geometries
+  driveMileLayer = await buildDriveMileLayer(fpdGeometryClip, fpdCodes);
+  if (driveMileLayer) { driveMileLayer.title = "Drive Miles From Station"; driveMileLayer.visible = false; }
+
+  // Auto-aid stations -- stations whose DIST2-24 formally list this agency's FPD codes
+  const fpdCodesQuoted = fpdCodes.map(c => `'${c}'`).join(",");
+  const distClause     = fpdCodes.length === 1
+    ? `= ${fpdCodesQuoted}`
+    : `IN (${fpdCodesQuoted})`;
+  const autoAidExprStr = `(${
+    Array.from({ length: 23 }, (_, i) => `dist${i + 2} ${distClause}`).join(" OR ")
+  }) AND stntype IN ('A', 'B') AND dist1 NOT IN (${fpdCodesQuoted})`;
+
+  // Primary stations -- A and B types only, own FPD
+  stationsLayer = new FeatureLayer({
+    url:                  STATIONS_URL,
+    title:                "Fire Agency Station",
+    definitionExpression: `dist1 IN (${fpdCodes.map(c => `'${c}'`).join(",")}) AND stntype IN ('A', 'B')`,
+    outFields:            ["*"],
+    labelsVisible:        true,
+    labelingInfo:         [STATION_LABEL_CLASS(13)],
+    renderer:             STATION_RENDERER,
+    popupEnabled:         true,
+    popupTemplate:        FIRE_AGENCY_POPUP,
+  });
+
+  // Auto-aid stations -- stations whose home FPD has drive mile coverage reaching
+  // this district. Derived from drive mile dist1 codes -- more reliable than DIST2-24.
+  autoAidStationsLayer = new FeatureLayer({
+    url:                  STATIONS_URL,
+    title:                "Auto Aid Station",
+    definitionExpression: autoAidExprStr,
+    outFields:            ["*"],
+    opacity:              0.5,
+    labelsVisible:        true,
+    labelingInfo:         [STATION_LABEL_CLASS(11)],
+    renderer:             STATION_RENDERER,
+    popupEnabled:         true,
+    popupTemplate:        { ...STATION_POPUP, title: "Auto Aid: {stationname}" },
+  });
+
+  countiesLayer = new FeatureLayer({
+    portalItem: { id: "062da51f92e241a191b780f8a876b548", portal: { url: PORTAL_URL } },
+    title:   "Counties",
+    layerId: 0,
+    renderer: {
+      type:   "simple",
+      symbol: {
+        type:    "simple-fill",
+        color:   [0, 0, 0, 0],
+        outline: { color: [110, 110, 110], width: 1.5 },
+      },
+    },
+    popupEnabled: false,
+  });
+
+  parcelsLayer = new FeatureLayer({
+    portalItem: { id: "8674ee29c0f04607b3a434a7a77cba2f", portal: { url: PORTAL_URL } },
+    minScale:   25000,
+    opacity:    0.6,
+    outFields:  ["Address","City","State","ZIP","Property_ID","DATA_LINK","LandUse","LandValue"],
+    renderer: {
+      type:   "simple",
+      symbol: {
+        type:    "simple-fill",
+        color:   [0, 0, 0, 0],
+        outline: { color: [180, 150, 90], width: 0.5 },
+      },
+    },
+    popupEnabled: true,
+    popupTemplate: {
+      title: "Parcel Details",
+      expressionInfos: [
+        {
+          name: "address-proper",
+          expression: `${ARCADE_PROPER_FN}\n${ARCADE_ADDRESS_EX}\nreturn ProperWithExceptions($feature.Address, ex)`,
+        },
+        { name: "city-line",      expression: `return Proper($feature.City) + '  ' + $feature.State + ' ' + $feature.ZIP` },
+        { name: "landuse-proper", expression: `return Proper($feature.LandUse)` },
+      ],
+      content: [{
+        type: "text",
+        text: popupTable(
+          popupRow("Address", "{expression/address-proper}"),
+          popupRow("City", "{expression/city-line}"),
+          popupRow("Property ID", "{Property_ID}"),
+          popupRow("Data Link", "<a href='{DATA_LINK}' target='_blank' style='color:#0079c1'>View Assessor records</a>"),
+          popupRow("Land Use", "{expression/landuse-proper}"),
+          popupRow("Value", "{LandValue}"),
+        ),
+      }],
+    },
+  });
+
+  const mapEl = document.getElementById("map-view");
+  await mapEl.viewOnReady();
+  view = mapEl.view;
+  const layers = [countiesLayer, parcelsLayer, autoAidStationsLayer, stationsLayer, fireProtectionLayer, fpdLayer];
+  if (driveMileLayer)   layers.splice(2, 0, driveMileLayer);
+  if (hydrantBufLayer)  layers.splice(2, 0, hydrantBufLayer);
+  view.map.addMany(layers);
+
+  updateLabel(fireProt);
+  zoomToLayer(fpdLayer, view);
+}
+
+// ---------------------------------------------------------------------------
+// App entry point -- called after successful OAuth sign-in
+// ---------------------------------------------------------------------------
+
+async function startApp(cred) {
+  credential = cred;
+  const fireProt = await lookupAgency(credential.userId);
+  const { geometry: fpdGeometry, fpdCodes, fdid } = await getFPDInfo(fireProt);
+  await initMap(fireProt, fpdGeometry, fpdCodes, fdid);
+
+  document.getElementById("loading-overlay").style.display  = "none";
+  document.getElementById("header-org-name").style.display  = "block";
+  document.getElementById("header-user").style.display      = "block";
+
+  // Open layer list now that layers exist
+  const layerListExpand = document.querySelector('arcgis-expand[expand-icon="layers"]');
+  if (layerListExpand) layerListExpand.expanded = true;
+}
+
+// ---------------------------------------------------------------------------
+// OAuth sign-in -- checkSignInStatus first (handles page reload after redirect)
+// ---------------------------------------------------------------------------
+
+try {
+  const cred = await esriId.checkSignInStatus(PORTAL_URL + "/sharing");
+  await startApp(cred);
+} catch {
+  // Not signed in -- getCredential triggers the Portal login redirect
+  const cred = await esriId.getCredential(PORTAL_URL + "/sharing");
+  await startApp(cred);
+}
+
+</script>
+</body>
+</html>
