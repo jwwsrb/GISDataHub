@@ -243,6 +243,7 @@ async function lookupAgency(userId) {
 // ---------------------------------------------------------------------------
 
 async function getFPDInfo(fireProt) {
+  console.log("fireProt:", JSON.stringify(fireProt))
   const params = new URLSearchParams({
     where:          `fire_prote = ${sqlQuote(fireProt)}`,
     returnGeometry: true,
