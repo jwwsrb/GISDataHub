@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FireProtectionHub v2 — State Contract Proof</title>
+  <title>FireProtectionHub v2</title>
+
+  <!-- ArcGIS Maps SDK for JavaScript (4.29 / Maps SDK 5.1) -->
+  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/dark/main.css" />
+  <script src="https://js.arcgis.com/4.29/"></script>
 
   <!-- Calcite Design System -->
   <script type="module" src="https://js.arcgis.com/calcite-components/3.0.3/calcite.esm.js"></script>
@@ -211,62 +215,12 @@
       margin-bottom: 0.75rem;
     }
 
-    /* ── Map Area (stub) ─────────────────────────────────────────── */
+    /* ── Map Area ────────────────────────────────────────────────── */
     #map-area {
       flex: 1;
-      background: var(--fph-bg);
       position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       overflow: hidden;
     }
-
-    #map-stub {
-      text-align: center;
-      color: var(--fph-text-muted);
-    }
-    #map-stub .map-icon { font-size: 3rem; margin-bottom: 0.5rem; opacity: 0.3; }
-    #map-stub p { font-size: 0.8rem; opacity: 0.5; }
-
-    /* station grid sim */
-    #station-sim {
-      position: absolute;
-      bottom: 1rem;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      justify-content: center;
-      max-width: 500px;
-    }
-
-    .sim-btn {
-      padding: 0.4rem 0.85rem;
-      border-radius: 20px;
-      border: 1px solid var(--fph-border);
-      background: var(--fph-surface);
-      color: var(--fph-text-muted);
-      font-size: 0.75rem;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .sim-btn:hover { border-color: var(--fph-accent2); color: var(--fph-text); }
-    .sim-btn.selected { border-color: var(--fph-accent); background: rgba(232,93,47,0.12); color: var(--fph-accent); }
-
-    .sim-label {
-      font-size: 0.65rem;
-      color: var(--fph-text-muted);
-      text-align: center;
-      margin-bottom: 0.5rem;
-    }
-
-    .drive-mile-sim {
-      border-style: dashed !important;
-      border-color: rgba(59,130,246,0.4) !important;
-    }
-    .drive-mile-sim:hover { border-color: var(--fph-accent2) !important; }
 
     /* ── Right Panel ─────────────────────────────────────────────── */
     #right-panel {
@@ -522,24 +476,11 @@
       </div>
     </div>
 
-    <!-- Map Area (stub) -->
+    <!-- Map Area -->
     <main id="map-area">
-      <div id="map-stub">
-        <div class="map-icon">🗺️</div>
-        <p>ArcGIS JSAPI map mounts here (Task 2)</p>
-        <p style="margin-top:0.3rem">Simulate a map click or drive-mile proxy below</p>
-      </div>
-
-      <div id="station-sim">
-        <div style="width:100%">
-          <p class="sim-label">▸ STATION (direct select)</p>
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center" id="station-btns"></div>
-        </div>
-        <div style="width:100%;margin-top:0.6rem">
-          <p class="sim-label">▸ DRIVE-MILE polygon (proxy → resolves to station)</p>
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center" id="drivemile-btns"></div>
-        </div>
-      </div>
+      <arcgis-map id="the-map" item-id="" style="width:100%;height:100%">
+        <arcgis-zoom position="top-left"></arcgis-zoom>
+      </arcgis-map>
     </main>
 
     <!-- Right Card Stack -->
@@ -565,195 +506,288 @@
 const { atom, computed } = window.nanostores;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MOCK DATA — simulates what login / layer init would populate
+// LAYER URLs
+// ─────────────────────────────────────────────────────────────────────────────
+const STATIONS_URL   = "https://gisent-qa-ds.wsrb.com:6443/arcgis/rest/services/WSRBDataLayers/Fire_Protection/FeatureServer/0";
+const DRIVE_MILE_URL = "https://gisent-qa-ds.wsrb.com:6443/arcgis/rest/services/WSRBDataLayers/Fire_Protection/FeatureServer/7";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOCK AGENCY DATA — replace with real OAuth lookup when wiring login
 // ─────────────────────────────────────────────────────────────────────────────
 const MOCK_AGENCY = {
-  agencyName:   "King County Fire District 45",
-  fdid:         "WA-4-03045",
-  agencyCode:   "KCF45",
+  agencyName:     "King County Fire District 45",
+  fdid:           "WA-4-03045",
+  agencyCode:     "KCF45",
   portalUsername: "chief.johnson@kcfd45.wa.gov",
-  defExpression: "AGENCY_CODE = 'KCF45'",
-};
-
-const MOCK_STATIONS = [
-  { stationId: "KCF45-001", label: "Station 45",    address: "19901 SE May Valley Rd" },
-  { stationId: "KCF45-002", label: "Station 45-2",  address: "4520 NE 4th St" },
-  { stationId: "KCF45-003", label: "Station 45-3",  address: "17020 SE Newport Way" },
-];
-
-// drive-mile polygons carry STATION key — proxy targets
-const MOCK_DRIVE_MILES = [
-  { dmId: "DM-001", stationKey: "KCF45-001", label: "DM zone A" },
-  { dmId: "DM-002", stationKey: "KCF45-002", label: "DM zone B" },
-];
-
-const MOCK_SNAPSHOT = {
-  stationCount: 3,
-  hydrantCount: 412,
-  bufferCoverage: "87%",
-  loadedAt: new Date().toISOString(),
-};
-
-const STATION_DETAILS = {
-  "KCF45-001": { hydrants: 186, bufferSqMi: 4.2, driveMiPolygons: 1 },
-  "KCF45-002": { hydrants: 148, bufferSqMi: 3.7, driveMiPolygons: 1 },
-  "KCF45-003": { hydrants:  78, bufferSqMi: 2.1, driveMiPolygons: 0 },
+  defExpression:  "AGENCY_CODE = 'KCF45'",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SOURCE ATOMS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * $selection — { stationId: string | null }
- * stationId is the stable STATION key, never OBJECTID.
- * Agency is NOT a field here; it is the fixed floor set at login.
- */
+/** { stationId: string | null } — stable STATION key, never OBJECTID */
 const $selection = atom({ stationId: null });
 
-/**
- * $agencyContext — set once after OAuth resolves; read-only thereafter.
- * Contains: agencyName, fdid, agencyCode, portalUsername(s), defExpression.
- */
-const $agencyContext = atom(null);  // null until login resolves
+/** Set once after OAuth resolves; read-only after */
+const $agencyContext = atom(null);
 
-/**
- * $panelState — { openRailPanel: 'search'|'layers'|'legend'|'reports'|null }
- * UI-only. Selection logic must never read this atom.
- */
+/** UI-only — selection logic must never read this */
 const $panelState = atom({ openRailPanel: null });
 
-/**
- * $agencySnapshot — session-cached home-state counts + loadedAt.
- * Cache, not truth. Populated once by StationService after layers init.
- */
+/** Session-cached home-state counts. Cache, not truth. */
 const $agencySnapshot = atom(null);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPUTED STORES
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * $mode — derived from $selection only.
- * 'home'    → stationId is null
- * 'station' → stationId is set
- * Card stack renders purely from $mode; no card inspects raw selection.
- */
-const $mode = computed($selection, (sel) =>
+/** 'home' | 'station' — derived from $selection only */
+const $mode = computed($selection, sel =>
   sel.stationId === null ? "home" : "station"
 );
 
-/**
- * $breadcrumb — derived from $agencyContext + $selection.
- * Ordered ribbon entries: [ { label, action? }, ... ]
- * Ribbon renders this verbatim; its only behaviour is calling actions.
- */
-const $breadcrumb = computed(
-  [$agencyContext, $selection],
-  (ctx, sel) => {
-    if (!ctx) return [];
-    const crumbs = [
-      {
-        label: ctx.agencyName,
-        action: sel.stationId ? () => SelectionService.clearSelection() : null,
-      },
-    ];
-    if (sel.stationId) {
-      const station = MOCK_STATIONS.find(s => s.stationId === sel.stationId);
-      crumbs.push({
-        label: station ? station.label : sel.stationId,
-        action: null,  // current; no pop-to
-      });
-    }
-    return crumbs;
+/** Ordered ribbon entries — derived from $agencyContext + $selection */
+const $breadcrumb = computed([$agencyContext, $selection], (ctx, sel) => {
+  if (!ctx) return [];
+  const crumbs = [{
+    label: ctx.agencyName,
+    action: sel.stationId ? () => SelectionService.clearSelection() : null,
+  }];
+  if (sel.stationId) {
+    crumbs.push({ label: sel.stationId, action: null });
   }
-);
+  return crumbs;
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SELECTION SERVICE — the only writers; components never set atoms directly
+// MAP SERVICE — owns the view, layers, hit test, highlight, goTo
+// ─────────────────────────────────────────────────────────────────────────────
+const MapService = (() => {
+  let _view          = null;
+  let _stationsLayer = null;
+  let _driveMiLayer  = null;
+  let _highlight     = null;   // current highlight handle
+
+  function init(view, stationsLayer, driveMiLayer) {
+    _view          = view;
+    _stationsLayer = stationsLayer;
+    _driveMiLayer  = driveMiLayer;
+
+    // Wire map click → SelectionService (Task 2 deliverable)
+    _view.on("click", async (event) => {
+      const hitResult = await _view.hitTest(event, {
+        include: [_stationsLayer, _driveMiLayer],
+      });
+
+      if (!hitResult.results.length) {
+        // Empty click — clear selection
+        SelectionService.clearSelection();
+        return;
+      }
+
+      // ── Explicit layer priority ───────────────────────────────────
+      // 1. Station point wins if present anywhere in the hit results
+      const stationHit = hitResult.results.find(
+        r => r.layer === _stationsLayer
+      );
+      if (stationHit) {
+        const stationId = stationHit.graphic.attributes["STATION"];
+        log(`hit: station layer → STATION="${stationId}"`, "action");
+        SelectionService.selectStation(stationId, "map");
+        return;
+      }
+
+      // 2. Drive-mile polygon — resolve via STATION key (proxy)
+      const driveMiHit = hitResult.results.find(
+        r => r.layer === _driveMiLayer
+      );
+      if (driveMiHit) {
+        const stationId = driveMiHit.graphic.attributes["STATION"];
+        log(`hit: drive-mile layer → proxying STATION="${stationId}"`, "action");
+        SelectionService.selectStation(stationId, "map");
+        return;
+      }
+
+      // 3. Anything else (hydrant buffer, etc.) — fall through, do nothing
+      log("hit: non-selectable layer — ignoring", "side");
+    });
+
+    log("MapService ready — hit test wired", "state");
+  }
+
+  /** Zoom to a station point feature by STATION key */
+  async function goToStation(stationId) {
+    if (!_view || !_stationsLayer) return;
+    try {
+      const result = await _stationsLayer.queryFeatures({
+        where: `STATION = '${stationId}'`,
+        returnGeometry: true,
+        outFields: ["STATION"],
+      });
+      if (result.features.length) {
+        await _view.goTo({ target: result.features[0].geometry, zoom: 14 });
+        log(`goTo: zoomed to ${stationId}`, "side");
+      }
+    } catch (e) {
+      log(`goTo failed for ${stationId}: ${e.message}`, "side");
+    }
+  }
+
+  /** Highlight a station feature by STATION key; clears previous */
+  async function highlightStation(stationId) {
+    if (!_view || !_stationsLayer) return;
+    clearHighlight();
+    try {
+      const layerView = await _view.whenLayerView(_stationsLayer);
+      const result = await _stationsLayer.queryFeatures({
+        where: `STATION = '${stationId}'`,
+        returnGeometry: false,
+        outFields: ["OBJECTID"],
+      });
+      if (result.features.length) {
+        _highlight = layerView.highlight(result.features);
+        log(`highlight: applied to ${stationId}`, "side");
+      }
+    } catch (e) {
+      log(`highlight failed for ${stationId}: ${e.message}`, "side");
+    }
+  }
+
+  function clearHighlight() {
+    if (_highlight) { _highlight.remove(); _highlight = null; }
+  }
+
+  return { init, goToStation, highlightStation, clearHighlight };
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELECTION SERVICE — sole writer of atoms; components never set directly
 // ─────────────────────────────────────────────────────────────────────────────
 const SelectionService = (() => {
 
   /**
    * selectStation(stationId, source)
-   * source: 'map' | 'search' | 'ribbon' | 'list'
-   * Side effects: search/list → zoom (stubbed); map → no re-zoom.
+   * source: 'map' | 'search' | 'list' | 'ribbon'
+   * map       → highlight only, no re-zoom (feature already visible)
+   * search/list → highlight + goTo
+   * ribbon    → highlight only
    */
   function selectStation(stationId, source = "map") {
-    log(`selectStation("${stationId}", "${source}")`, "action");
+    log(`selectStation("${stationId}", source="${source}")`, "action");
     $selection.set({ stationId });
 
-    // Source-driven side effects (map/zoom stubbed — Task 2 wires real JSAPI)
+    MapService.highlightStation(stationId);
+
     if (source === "search" || source === "list") {
-      sideEffect(`[goTo] zoom to station ${stationId} (source="${source}")`);
-    } else if (source === "map") {
-      sideEffect(`[map click] no re-zoom — feature already visible`);
-    } else if (source === "ribbon") {
-      sideEffect(`[ribbon] pop-to action — no re-zoom`);
+      MapService.goToStation(stationId);
     }
 
     log(`$selection → ${JSON.stringify($selection.get())}`, "state");
   }
 
-  /**
-   * clearSelection() — returns to home mode.
-   */
+  /** Return to home mode */
   function clearSelection() {
-    log(`clearSelection()`, "action");
+    log("clearSelection()", "action");
     $selection.set({ stationId: null });
+    MapService.clearHighlight();
     log(`$selection → ${JSON.stringify($selection.get())}`, "state");
   }
 
-  /**
-   * setPanel(panelId) — toggles rail panel; closes previous.
-   * UI-only; never read by selection logic.
-   */
+  /** Toggle rail panel — UI-only, never read by selection logic */
   function setPanel(panelId) {
     const current = $panelState.get().openRailPanel;
     const next = current === panelId ? null : panelId;
-    log(`setPanel("${panelId}") → openRailPanel: ${next}`, "action");
+    log(`setPanel("${panelId}") → ${next}`, "action");
     $panelState.set({ openRailPanel: next });
   }
 
   return { selectStation, clearSelection, setPanel };
 })();
 
-// expose globally so inline onclick attrs can reach it
 window.SelectionService = SelectionService;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SIMULATE LOGIN — populate $agencyContext and $agencySnapshot
+// STATION SERVICE — loads layer data for cards and snapshot
 // ─────────────────────────────────────────────────────────────────────────────
-function simulateLogin() {
-  log("OAuth resolved — setting $agencyContext", "state");
-  $agencyContext.set(MOCK_AGENCY);
-  log("StationService query complete — setting $agencySnapshot", "state");
-  $agencySnapshot.set(MOCK_SNAPSHOT);
-}
+const StationService = (() => {
+  let _stationsLayer = null;
+  let _stations      = [];   // in-memory list for search panel
+
+  function init(stationsLayer) {
+    _stationsLayer = stationsLayer;
+  }
+
+  async function loadAgencyStations(defExpression) {
+    if (!_stationsLayer) return [];
+    try {
+      const result = await _stationsLayer.queryFeatures({
+        where: defExpression || "1=1",
+        outFields: ["STATION", "STATION_NAME", "ADDRESS"],
+        returnGeometry: false,
+        orderByFields: ["STATION"],
+      });
+      _stations = result.features.map(f => ({
+        stationId: f.attributes["STATION"],
+        label:     f.attributes["STATION_NAME"] || f.attributes["STATION"],
+        address:   f.attributes["ADDRESS"] || "",
+      }));
+      log(`StationService: loaded ${_stations.length} stations`, "state");
+      return _stations;
+    } catch (e) {
+      log(`StationService query failed: ${e.message}`, "side");
+      return [];
+    }
+  }
+
+  async function loadSnapshot(defExpression) {
+    if (!_stationsLayer) return null;
+    try {
+      const count = await _stationsLayer.queryFeatureCount({
+        where: defExpression || "1=1",
+      });
+      const snap = {
+        stationCount: count,
+        hydrantCount: "—",   // hydrant layer query added when layer is wired
+        bufferCoverage: "—",
+        loadedAt: new Date().toISOString(),
+      };
+      $agencySnapshot.set(snap);
+      log(`StationService: snapshot set (${count} stations)`, "state");
+      return snap;
+    } catch (e) {
+      log(`StationService snapshot failed: ${e.message}`, "side");
+      return null;
+    }
+  }
+
+  function getStations() { return _stations; }
+
+  return { init, loadAgencyStations, loadSnapshot, getStations };
+})();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RENDERING — subscribe to atoms/computed stores, re-render on change
+// RENDERING
 // ─────────────────────────────────────────────────────────────────────────────
 
 function renderRibbon() {
   const ribbon = document.getElementById("ribbon");
   const crumbs = $breadcrumb.get();
   const mode   = $mode.get();
+  const badge  = `<span class="mode-badge ${mode}">${mode === "home" ? "HOME" : "STATION"}</span>`;
 
-  const badge = `<span class="mode-badge ${mode}">${mode === "home" ? "HOME" : "STATION"}</span>`;
-
-  if (crumbs.length === 0) {
+  if (!crumbs.length) {
     ribbon.innerHTML = `<span style="color:var(--fph-text-muted);font-size:0.75rem">Authenticating…</span>${badge}`;
     return;
   }
 
   const parts = crumbs.map((c, i) => {
-    const isLast = i === crumbs.length - 1;
     const sep = i > 0 ? `<span class="ribbon-sep">›</span>` : "";
+    const isLast = i === crumbs.length - 1;
     if (isLast || !c.action) {
       return `${sep}<span class="ribbon-crumb"><button class="active" disabled>${c.label}</button></span>`;
     }
-    return `${sep}<span class="ribbon-crumb"><button onclick="SelectionService.clearSelection()" title="Back to agency">${c.label}</button></span>`;
+    return `${sep}<span class="ribbon-crumb"><button onclick="SelectionService.clearSelection()">${c.label}</button></span>`;
   }).join("");
 
   ribbon.innerHTML = parts + badge;
@@ -761,13 +795,10 @@ function renderRibbon() {
 
 function renderRailButtons() {
   const { openRailPanel } = $panelState.get();
-  document.querySelectorAll(".rail-btn").forEach(btn => {
-    const p = btn.dataset.panel;
-    btn.classList.toggle("active", p === openRailPanel);
-  });
-
-  const leftPanel = document.getElementById("left-panel");
-  leftPanel.classList.toggle("open", openRailPanel !== null);
+  document.querySelectorAll(".rail-btn").forEach(btn =>
+    btn.classList.toggle("active", btn.dataset.panel === openRailPanel)
+  );
+  document.getElementById("left-panel").classList.toggle("open", openRailPanel !== null);
 }
 
 function renderLeftPanel() {
@@ -780,65 +811,59 @@ function renderLeftPanel() {
 
   if (openRailPanel === "search") {
     content += `
-      <input class="search-input" placeholder="Station name or ID…" oninput="handleSearchInput(this.value)" id="search-input" />
-      <div id="search-results"></div>
-    `;
+      <input class="search-input" placeholder="Station name or ID…"
+             oninput="handleSearchInput(this.value)" id="search-input" />
+      <div id="search-results"></div>`;
   } else if (openRailPanel === "layers") {
-    content += MOCK_STATIONS.map(s => `
+    content += `
       <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
-        <span>● ${s.label}</span><span style="font-size:0.65rem">visible</span>
-      </div>`).join("") + `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
-        <span>⬡ Hydrant Buffers</span><span style="font-size:0.65rem;color:#a78bfa">display-only</span>
+        <span>● Fire Stations</span><span style="font-size:0.65rem">selectable</span>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
-        <span>⬡ Drive Miles</span><span style="font-size:0.65rem">visible</span>
+        <span>⬡ Drive Miles</span><span style="font-size:0.65rem">proxy → station</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
+        <span>⬡ Hydrant Buffers</span><span style="font-size:0.65rem;color:#a78bfa">display-only</span>
       </div>`;
   } else if (openRailPanel === "legend") {
     content += `
       <div class="section-label">Stations</div>
-      <div style="font-size:0.75rem;color:var(--fph-text-muted)">● Point feature — selectable</div>
+      <div style="font-size:0.75rem;color:var(--fph-text-muted)">● Point — selectable</div>
       <div class="section-label" style="margin-top:0.75rem">Drive Miles</div>
       <div style="font-size:0.75rem;color:var(--fph-text-muted)">⬡ Polygon — proxy for station</div>
       <div class="section-label" style="margin-top:0.75rem">Hydrant Buffers</div>
       <div style="font-size:0.75rem;color:#a78bfa">⬡ Display-only — not selectable</div>`;
   } else if (openRailPanel === "reports") {
-    content += `<div style="font-size:0.75rem;color:var(--fph-text-muted)">Report generation — Task N (stub)</div>`;
+    content += `<div style="font-size:0.75rem;color:var(--fph-text-muted)">Report generation — future task</div>`;
   }
 
   inner.innerHTML = content;
-
-  // restore search state if panel was already open
-  if (openRailPanel === "search") {
-    renderSearchResults("");
-  }
+  if (openRailPanel === "search") renderSearchResults("");
 }
 
-window.handleSearchInput = function(val) {
-  renderSearchResults(val);
-};
+window.handleSearchInput = function(val) { renderSearchResults(val); };
 
 function renderSearchResults(query) {
   const el = document.getElementById("search-results");
   if (!el) return;
+  const stations = StationService.getStations();
   const q = query.trim().toLowerCase();
   const matches = q.length === 0
-    ? MOCK_STATIONS
-    : MOCK_STATIONS.filter(s =>
+    ? stations
+    : stations.filter(s =>
         s.label.toLowerCase().includes(q) ||
         s.stationId.toLowerCase().includes(q) ||
         s.address.toLowerCase().includes(q)
       );
 
-  if (matches.length === 0) {
+  if (!matches.length) {
     el.innerHTML = `<p style="font-size:0.75rem;color:var(--fph-text-muted);padding:0.5rem 0">No stations match</p>`;
     return;
   }
-
   el.innerHTML = matches.map(s => `
     <div class="search-result" onclick="SelectionService.selectStation('${s.stationId}','search')">
       <div>${s.label}</div>
-      <div class="sr-id">${s.stationId} · ${s.address}</div>
+      <div class="sr-id">${s.stationId}${s.address ? " · " + s.address : ""}</div>
     </div>`).join("");
 }
 
@@ -857,17 +882,15 @@ function renderCardStack() {
   if (mode === "home") {
     right.innerHTML = agencyCardExpanded(ctx, snap);
   } else {
-    // station mode: AgencyCard collapsed to header strip, then StationCard + RelatedAssetsList
-    const station = MOCK_STATIONS.find(s => s.stationId === sel.stationId);
-    const details = STATION_DETAILS[sel.stationId] || {};
-    right.innerHTML =
-      agencyCardCollapsed(ctx) +
-      stationCard(station, details) +
-      relatedAssetsList(station, details);
+    const stations = StationService.getStations();
+    const station  = stations.find(s => s.stationId === sel.stationId)
+                     || { stationId: sel.stationId, label: sel.stationId, address: "" };
+    right.innerHTML = agencyCardCollapsed(ctx) + stationCard(station) + relatedAssetsList(station);
   }
 }
 
 function agencyCardExpanded(ctx, snap) {
+  const stations = StationService.getStations();
   return `
     <div class="card expanded">
       <div class="card-header">
@@ -887,20 +910,21 @@ function agencyCardExpanded(ctx, snap) {
           <div class="data-item"><div class="di-val">${snap.stationCount}</div><div class="di-label">Stations</div></div>
           <div class="data-item"><div class="di-val">${snap.hydrantCount}</div><div class="di-label">Hydrants</div></div>
           <div class="data-item"><div class="di-val">${snap.bufferCoverage}</div><div class="di-label">Buffer Cov.</div></div>
-          <div class="data-item"><div class="di-val">${snap.stationCount}</div><div class="di-label">Drive-Mi Zones</div></div>
+          <div class="data-item"><div class="di-val">—</div><div class="di-label">Drive-Mi Zones</div></div>
         </div>
         <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.6rem">
           Snapshot loaded ${new Date(snap.loadedAt).toLocaleTimeString()} — cache, not live
-        </p>` : `<p style="font-size:0.75rem;color:var(--fph-text-muted);margin-top:0.5rem">Loading snapshot…</p>`}
-
+        </p>` : `<p style="font-size:0.75rem;color:var(--fph-text-muted);margin-top:0.5rem">Loading data…</p>`}
+        ${stations.length ? `
         <div class="section-label" style="margin-top:0.9rem">Stations</div>
         <ul class="asset-list">
-          ${MOCK_STATIONS.map(s => `
-            <li class="asset-item" style="cursor:pointer" onclick="SelectionService.selectStation('${s.stationId}','list')">
+          ${stations.map(s => `
+            <li class="asset-item" style="cursor:pointer"
+                onclick="SelectionService.selectStation('${s.stationId}','list')">
               <span class="ai-name">${s.label}</span>
-              <span class="ai-count">${s.address}</span>
+              <span class="ai-count" style="font-size:0.65rem">${s.stationId}</span>
             </li>`).join("")}
-        </ul>
+        </ul>` : ""}
       </div>
     </div>`;
 }
@@ -918,15 +942,14 @@ function agencyCardCollapsed(ctx) {
     </div>`;
 }
 
-function stationCard(station, details) {
-  if (!station) return "";
+function stationCard(station) {
   return `
     <div class="card expanded">
       <div class="card-header">
         <div class="card-icon icon-station">🚒</div>
         <div class="card-title-group">
           <div class="card-title">${station.label}</div>
-          <div class="card-subtitle">${station.address}</div>
+          <div class="card-subtitle">${station.address || station.stationId}</div>
         </div>
       </div>
       <div class="card-body">
@@ -934,20 +957,19 @@ function stationCard(station, details) {
           <span class="tag">${station.stationId}</span>
         </div>
         <div class="data-grid" style="margin-top:0.75rem">
-          <div class="data-item"><div class="di-val">${details.hydrants ?? "—"}</div><div class="di-label">Hydrants</div></div>
-          <div class="data-item"><div class="di-val">${details.bufferSqMi ?? "—"}</div><div class="di-label">Buffer mi²</div></div>
-          <div class="data-item"><div class="di-val">${details.driveMiPolygons ?? 0}</div><div class="di-label">Drive-Mi Zones</div></div>
+          <div class="data-item"><div class="di-val">—</div><div class="di-label">Hydrants</div></div>
+          <div class="data-item"><div class="di-val">—</div><div class="di-label">Buffer mi²</div></div>
+          <div class="data-item"><div class="di-val">—</div><div class="di-label">Drive-Mi Zones</div></div>
           <div class="data-item"><div class="di-val">—</div><div class="di-label">Apparatus</div></div>
         </div>
         <p style="font-size:0.65rem;color:var(--fph-text-muted);margin-top:0.5rem">
-          Attributes loaded from StationService query (Task 2)
+          Detail queries wired in StationService (future task)
         </p>
       </div>
     </div>`;
 }
 
-function relatedAssetsList(station, details) {
-  if (!station) return "";
+function relatedAssetsList(station) {
   return `
     <div class="card expanded">
       <div class="card-header">
@@ -961,11 +983,11 @@ function relatedAssetsList(station, details) {
         <ul class="asset-list">
           <li class="asset-item">
             <span class="ai-name">Hydrant buffers</span>
-            <span class="ai-count">${details.hydrants ?? "—"}</span>
+            <span class="ai-count">—</span>
           </li>
           <li class="asset-item" style="opacity:0.55">
             <span class="ai-name">Drive-mile polygons</span>
-            <span class="ai-count">${details.driveMiPolygons ?? 0}</span>
+            <span class="ai-count">—</span>
           </li>
           <li class="asset-item" style="opacity:0.35">
             <span class="ai-name">Apparatus / CP feed</span>
@@ -980,87 +1002,93 @@ function relatedAssetsList(station, details) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WIRE UP SIMULATION BUTTONS
-// ─────────────────────────────────────────────────────────────────────────────
-function buildSimButtons() {
-  const stationContainer  = document.getElementById("station-btns");
-  const driveMileContainer = document.getElementById("drivemile-btns");
-
-  stationContainer.innerHTML = MOCK_STATIONS.map(s => `
-    <button class="sim-btn" id="sim-${s.stationId}"
-      onclick="SelectionService.selectStation('${s.stationId}','map')">
-      📍 ${s.label}
-    </button>`).join("") + `
-    <button class="sim-btn" style="color:var(--fph-accent)" onclick="SelectionService.clearSelection()">
-      ✕ Clear
-    </button>`;
-
-  driveMileContainer.innerHTML = MOCK_DRIVE_MILES.map(dm => `
-    <button class="sim-btn drive-mile-sim" id="sim-dm-${dm.dmId}"
-      onclick="SelectionService.selectStation('${dm.stationKey}','map')">
-      ⬡ ${dm.label} → ${dm.stationKey}
-    </button>`).join("");
-}
-
-function syncSimButtonHighlight() {
-  const sel = $selection.get();
-  document.querySelectorAll(".sim-btn").forEach(b => b.classList.remove("selected"));
-  if (sel.stationId) {
-    const btn = document.getElementById(`sim-${sel.stationId}`);
-    if (btn) btn.classList.add("selected");
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DEV LOG HELPERS
+// DEV LOG
 // ─────────────────────────────────────────────────────────────────────────────
 function log(msg, type = "") {
   const el = document.getElementById("log-body");
-  const ts = new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
   const div = document.createElement("div");
   div.className = `log-entry ${type}`;
   div.textContent = `${ts}  ${msg}`;
   el.prepend(div);
 }
 
-function sideEffect(msg) {
-  log(`  ↳ STUB: ${msg}`, "stub");
-}
-
 window.toggleLog = function() {
   const body = document.getElementById("log-body");
   body.style.display = body.style.display === "none" ? "" : "none";
 };
-
 window.clearLog = function() {
   document.getElementById("log-body").innerHTML = "";
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SUBSCRIPTIONS — re-render on any relevant store change
+// SUBSCRIPTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 $breadcrumb.subscribe(renderRibbon);
 $mode.subscribe(renderCardStack);
 $agencyContext.subscribe(renderCardStack);
 $agencySnapshot.subscribe(renderCardStack);
-$panelState.subscribe(() => {
-  renderRailButtons();
-  renderLeftPanel();
-});
-$selection.subscribe(syncSimButtonHighlight);
+$panelState.subscribe(() => { renderRailButtons(); renderLeftPanel(); });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BOOT
+// BOOT — wire JSAPI via AMD require
 // ─────────────────────────────────────────────────────────────────────────────
-buildSimButtons();
-renderRibbon();       // shows "Authenticating…" until login resolves
+renderRibbon();
 renderCardStack();
 
-// simulate async OAuth + StationService (500ms)
-setTimeout(() => {
-  simulateLogin();
-  log("App ready", "state");
-}, 500);
+require([
+  "esri/layers/FeatureLayer",
+  "esri/Map",
+  "esri/views/MapView",
+  "esri/widgets/Zoom",
+], function(FeatureLayer, Map, MapView, Zoom) {
+
+  // ── Layers ────────────────────────────────────────────────────────
+  const stationsLayer = new FeatureLayer({
+    url: STATIONS_URL,
+    definitionExpression: MOCK_AGENCY.defExpression,
+    outFields: ["*"],
+  });
+
+  const driveMiLayer = new FeatureLayer({
+    url: DRIVE_MILE_URL,
+    definitionExpression: MOCK_AGENCY.defExpression,
+    outFields: ["STATION"],
+  });
+
+  // ── Map + View ────────────────────────────────────────────────────
+  const map = new Map({
+    basemap: "dark-gray-vector",
+    layers: [driveMiLayer, stationsLayer],  // stations on top
+  });
+
+  const view = new MapView({
+    container: "the-map",
+    map,
+    center: [-122.3, 47.5],   // WA default — goTo will navigate on first selection
+    zoom: 10,
+  });
+
+  // ── Init services ─────────────────────────────────────────────────
+  MapService.init(view, stationsLayer, driveMiLayer);
+  StationService.init(stationsLayer);
+
+  view.when(async () => {
+    log("View ready", "state");
+
+    // Set agency context (replace with real OAuth resolver)
+    $agencyContext.set(MOCK_AGENCY);
+    log("$agencyContext set (mock — replace with OAuth resolver)", "state");
+
+    // Load station list + snapshot from real layer
+    await StationService.loadAgencyStations(MOCK_AGENCY.defExpression);
+    await StationService.loadSnapshot(MOCK_AGENCY.defExpression);
+
+    // Re-render cards now that station list is populated
+    renderCardStack();
+    log("App ready", "state");
+  });
+});
 </script>
 </body>
 </html>
