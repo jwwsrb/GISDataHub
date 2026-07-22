@@ -9,8 +9,50 @@
   <script type="module" src="https://js.arcgis.com/calcite-components/3.0.3/calcite.esm.js"></script>
   <link rel="stylesheet" href="https://js.arcgis.com/calcite-components/3.0.3/calcite.css" />
 
-  <!-- nanostores via CDN (UMD builds) -->
-  <script src="https://cdn.jsdelivr.net/npm/nanostores@0.11.3/index.umd.js"></script>
+  <!-- nanostores — inlined to avoid CDN/module timing issues -->
+  <script>
+  (function(global) {
+    // Minimal nanostores: atom + computed
+    function atom(initial) {
+      let value = initial;
+      const listeners = [];
+      const store = {
+        get() { return value; },
+        set(next) {
+          value = next;
+          listeners.forEach(fn => fn(value));
+        },
+        subscribe(fn) {
+          listeners.push(fn);
+          fn(value);
+          return () => { const i = listeners.indexOf(fn); if (i > -1) listeners.splice(i, 1); };
+        }
+      };
+      return store;
+    }
+
+    function computed(deps, fn) {
+      const sources = Array.isArray(deps) ? deps : [deps];
+      let value = fn(...sources.map(s => s.get()));
+      const listeners = [];
+      const recompute = () => {
+        value = fn(...sources.map(s => s.get()));
+        listeners.forEach(f => f(value));
+      };
+      sources.forEach(s => s.subscribe(() => recompute()));
+      return {
+        get() { return value; },
+        subscribe(fn) {
+          listeners.push(fn);
+          fn(value);
+          return () => { const i = listeners.indexOf(fn); if (i > -1) listeners.splice(i, 1); };
+        }
+      };
+    }
+
+    global.nanostores = { atom, computed };
+  })(window);
+  </script>
 
   <style>
     :root {
@@ -516,10 +558,9 @@
     <div id="log-body"></div>
   </div>
 
-<script type="module">
+<script>
 // ─────────────────────────────────────────────────────────────────────────────
-// nanostores — loaded via UMD global from CDN script tag
-// The CDN build exposes: window.nanostores = { atom, computed, ... }
+// nanostores — from inline implementation above
 // ─────────────────────────────────────────────────────────────────────────────
 const { atom, computed } = window.nanostores;
 
