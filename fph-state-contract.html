@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FireProtectionHub v2 — State Contract Proof</title>
+
+  <!-- Calcite Design System -->
+  <script type="module" src="https://js.arcgis.com/calcite-components/3.0.3/calcite.esm.js"></script>
+  <link rel="stylesheet" href="https://js.arcgis.com/calcite-components/3.0.3/calcite.css" />
+
+  <!-- nanostores via CDN (UMD builds) -->
+  <script src="https://cdn.jsdelivr.net/npm/nanostores@0.11.3/index.umd.js"></script>
+
+  <style>
+    :root {
+      --fph-rail-width: 3.5rem;
+      --fph-panel-width: 320px;
+      --fph-right-width: 340px;
+      --fph-ribbon-h: 2.5rem;
+      --fph-bg: #1a1f2e;
+      --fph-surface: #242938;
+      --fph-surface2: #2d3347;
+      --fph-border: rgba(255,255,255,0.09);
+      --fph-accent: #e85d2f;
+      --fph-accent2: #3b82f6;
+      --fph-text: #e8eaf0;
+      --fph-text-muted: #8891aa;
+      --fph-tag-bg: rgba(59,130,246,0.15);
+      --fph-tag-text: #93c5fd;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--fph-bg);
+      color: var(--fph-text);
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Context Ribbon ──────────────────────────────────────────── */
+    #ribbon {
+      height: var(--fph-ribbon-h);
+      background: var(--fph-surface);
+      border-bottom: 1px solid var(--fph-border);
+      display: flex;
+      align-items: center;
+      padding: 0 1rem;
+      gap: 0;
+      flex-shrink: 0;
+      font-size: 0.78rem;
+    }
+
+    .ribbon-crumb {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--fph-text-muted);
+    }
+
+    .ribbon-crumb button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--fph-text-muted);
+      font-size: 0.78rem;
+      padding: 0.2rem 0.35rem;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .ribbon-crumb button:hover { color: var(--fph-text); background: var(--fph-surface2); }
+    .ribbon-crumb button.active { color: var(--fph-text); font-weight: 600; }
+    .ribbon-crumb button:disabled { cursor: default; }
+
+    .ribbon-sep {
+      margin: 0 0.25rem;
+      color: var(--fph-border);
+      user-select: none;
+      font-size: 0.9rem;
+    }
+
+    /* ── Shell body ──────────────────────────────────────────────── */
+    #shell-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Action Rail ─────────────────────────────────────────────── */
+    #action-rail {
+      width: var(--fph-rail-width);
+      background: var(--fph-surface);
+      border-right: 1px solid var(--fph-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.5rem 0;
+      gap: 0.25rem;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .rail-btn {
+      width: 2.5rem;
+      height: 2.5rem;
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--fph-text-muted);
+      font-size: 1.1rem;
+      transition: color 0.15s, background 0.15s;
+      position: relative;
+    }
+    .rail-btn:hover { color: var(--fph-text); background: var(--fph-surface2); }
+    .rail-btn.active {
+      color: var(--fph-accent);
+      background: rgba(232,93,47,0.12);
+    }
+    .rail-btn title { display: none; }
+    .rail-tooltip {
+      position: absolute;
+      left: calc(100% + 8px);
+      top: 50%;
+      transform: translateY(-50%);
+      background: #0d1117;
+      color: var(--fph-text);
+      font-size: 0.72rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s;
+      z-index: 100;
+    }
+    .rail-btn:hover .rail-tooltip { opacity: 1; }
+
+    /* ── Left Panel ──────────────────────────────────────────────── */
+    #left-panel {
+      width: 0;
+      overflow: hidden;
+      background: var(--fph-surface);
+      border-right: 1px solid var(--fph-border);
+      transition: width 0.2s ease;
+      flex-shrink: 0;
+    }
+    #left-panel.open { width: var(--fph-panel-width); }
+    #left-panel-inner {
+      width: var(--fph-panel-width);
+      height: 100%;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .panel-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fph-text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Map Area (stub) ─────────────────────────────────────────── */
+    #map-area {
+      flex: 1;
+      background: var(--fph-bg);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #map-stub {
+      text-align: center;
+      color: var(--fph-text-muted);
+    }
+    #map-stub .map-icon { font-size: 3rem; margin-bottom: 0.5rem; opacity: 0.3; }
+    #map-stub p { font-size: 0.8rem; opacity: 0.5; }
+
+    /* station grid sim */
+    #station-sim {
+      position: absolute;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 500px;
+    }
+
+    .sim-btn {
+      padding: 0.4rem 0.85rem;
+      border-radius: 20px;
+      border: 1px solid var(--fph-border);
+      background: var(--fph-surface);
+      color: var(--fph-text-muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sim-btn:hover { border-color: var(--fph-accent2); color: var(--fph-text); }
+    .sim-btn.selected { border-color: var(--fph-accent); background: rgba(232,93,47,0.12); color: var(--fph-accent); }
+
+    .sim-label {
+      font-size: 0.65rem;
+      color: var(--fph-text-muted);
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .drive-mile-sim {
+      border-style: dashed !important;
+      border-color: rgba(59,130,246,0.4) !important;
+    }
+    .drive-mile-sim:hover { border-color: var(--fph-accent2) !important; }
+
+    /* ── Right Panel ─────────────────────────────────────────────── */
+    #right-panel {
+      width: var(--fph-right-width);
+      background: var(--fph-surface);
+      border-left: 1px solid var(--fph-border);
+      overflow-y: auto;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Cards ───────────────────────────────────────────────────── */
+    .card {
+      border-bottom: 1px solid var(--fph-border);
+      overflow: hidden;
+      transition: all 0.2s ease;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      gap: 0.6rem;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .card-header:hover { background: var(--fph-surface2); }
+
+    .card-icon {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .icon-agency { background: rgba(232,93,47,0.15); color: var(--fph-accent); }
+    .icon-station { background: rgba(59,130,246,0.15); color: var(--fph-accent2); }
+    .icon-assets { background: rgba(139,92,246,0.15); color: #a78bfa; }
+
+    .card-title-group { flex: 1; min-width: 0; }
+    .card-title { font-size: 0.82rem; font-weight: 600; color: var(--fph-text); }
+    .card-subtitle { font-size: 0.7rem; color: var(--fph-text-muted); margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .card-chevron {
+      font-size: 0.7rem;
+      color: var(--fph-text-muted);
+      transition: transform 0.2s;
+    }
+    .card.expanded .card-chevron { transform: rotate(180deg); }
+
+    .card-body {
+      display: none;
+      padding: 0 1rem 1rem;
+    }
+    .card.expanded .card-body { display: block; }
+
+    /* collapsed header strip */
+    .card.collapsed-strip .card-header {
+      padding: 0.4rem 0.75rem;
+      background: var(--fph-surface2);
+    }
+    .card.collapsed-strip .card-title { font-size: 0.75rem; }
+    .card.collapsed-strip .card-icon { width: 1.5rem; height: 1.5rem; font-size: 0.8rem; }
+
+    /* ── Data rows ───────────────────────────────────────────────── */
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .data-item {
+      background: var(--fph-surface2);
+      border-radius: 6px;
+      padding: 0.5rem 0.65rem;
+    }
+    .data-item .di-val {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--fph-text);
+      line-height: 1;
+    }
+    .data-item .di-label {
+      font-size: 0.65rem;
+      color: var(--fph-text-muted);
+      margin-top: 0.2rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-top: 0.6rem;
+    }
+    .tag {
+      font-size: 0.67rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 12px;
+      background: var(--fph-tag-bg);
+      color: var(--fph-tag-text);
+      font-weight: 500;
+    }
+
+    .asset-list {
+      list-style: none;
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .asset-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--fph-surface2);
+      border-radius: 6px;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.75rem;
+    }
+    .asset-item .ai-name { color: var(--fph-text); }
+    .asset-item .ai-count {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--fph-text-muted);
+      background: rgba(255,255,255,0.06);
+      padding: 0.1rem 0.4rem;
+      border-radius: 10px;
+    }
+
+    /* ── Log panel ───────────────────────────────────────────────── */
+    #log-panel {
+      position: fixed;
+      bottom: 0;
+      right: var(--fph-right-width);
+      width: 380px;
+      background: #0d1117;
+      border: 1px solid var(--fph-border);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 0.68rem;
+      z-index: 50;
+      overflow: hidden;
+    }
+    #log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.35rem 0.75rem;
+      background: var(--fph-surface2);
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.7rem;
+      color: var(--fph-text-muted);
+    }
+    #log-header .log-title { font-weight: 600; color: var(--fph-text); }
+    #log-body { height: 140px; overflow-y: auto; padding: 0.5rem 0.75rem; display: flex; flex-direction: column-reverse; }
+    .log-entry { padding: 0.15rem 0; color: #6ee7b7; line-height: 1.4; }
+    .log-entry.action { color: #93c5fd; }
+    .log-entry.state { color: #fcd34d; }
+    .log-entry.side { color: #a78bfa; }
+    .log-entry.stub { color: var(--fph-text-muted); font-style: italic; }
+
+    .clear-log { font-size: 0.65rem; color: var(--fph-text-muted); cursor: pointer; }
+    .clear-log:hover { color: var(--fph-text); }
+
+    /* ── Search stub in panel ────────────────────────────────────── */
+    .search-input {
+      width: 100%;
+      background: var(--fph-surface2);
+      border: 1px solid var(--fph-border);
+      border-radius: 6px;
+      color: var(--fph-text);
+      font-size: 0.8rem;
+      padding: 0.5rem 0.75rem;
+      outline: none;
+      margin-bottom: 0.75rem;
+    }
+    .search-input:focus { border-color: var(--fph-accent2); }
+    ::placeholder { color: var(--fph-text-muted); }
+
+    .search-result {
+      padding: 0.5rem 0.6rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      color: var(--fph-text);
+      transition: background 0.12s;
+    }
+    .search-result:hover { background: var(--fph-surface2); }
+    .search-result .sr-id { font-size: 0.67rem; color: var(--fph-text-muted); }
+
+    /* ── Misc ────────────────────────────────────────────────────── */
+    .section-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--fph-text-muted);
+      margin: 0.75rem 0 0.35rem;
+    }
+
+    .mode-badge {
+      font-size: 0.62rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      background: rgba(232,93,47,0.15);
+      color: var(--fph-accent);
+      margin-left: auto;
+    }
+    .mode-badge.home { background: rgba(16,185,129,0.12); color: #34d399; }
+  </style>
+</head>
+<body>
+
+  <!-- Context Ribbon -->
+  <div id="ribbon">
+    <!-- populated by renderRibbon() -->
+  </div>
+
+  <div id="shell-body">
+
+    <!-- Action Rail -->
+    <nav id="action-rail">
+      <button class="rail-btn" data-panel="search" onclick="SelectionService.setPanel('search')">
+        🔍<span class="rail-tooltip">Search</span>
+      </button>
+      <button class="rail-btn" data-panel="layers" onclick="SelectionService.setPanel('layers')">
+        ⊞<span class="rail-tooltip">Layers</span>
+      </button>
+      <button class="rail-btn" data-panel="legend" onclick="SelectionService.setPanel('legend')">
+        ≡<span class="rail-tooltip">Legend</span>
+      </button>
+      <button class="rail-btn" data-panel="reports" onclick="SelectionService.setPanel('reports')">
+        📄<span class="rail-tooltip">Reports</span>
+      </button>
+    </nav>
+
+    <!-- Left Panel -->
+    <div id="left-panel">
+      <div id="left-panel-inner" id="left-panel-content">
+        <!-- populated by renderLeftPanel() -->
+      </div>
+    </div>
+
+    <!-- Map Area (stub) -->
+    <main id="map-area">
+      <div id="map-stub">
+        <div class="map-icon">🗺️</div>
+        <p>ArcGIS JSAPI map mounts here (Task 2)</p>
+        <p style="margin-top:0.3rem">Simulate a map click or drive-mile proxy below</p>
+      </div>
+
+      <div id="station-sim">
+        <div style="width:100%">
+          <p class="sim-label">▸ STATION (direct select)</p>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center" id="station-btns"></div>
+        </div>
+        <div style="width:100%;margin-top:0.6rem">
+          <p class="sim-label">▸ DRIVE-MILE polygon (proxy → resolves to station)</p>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center" id="drivemile-btns"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right Card Stack -->
+    <aside id="right-panel">
+      <!-- populated by renderCardStack() -->
+    </aside>
+
+  </div>
+
+  <!-- Dev Log -->
+  <div id="log-panel">
+    <div id="log-header" onclick="toggleLog()">
+      <span class="log-title">Action Log</span>
+      <span class="clear-log" onclick="event.stopPropagation(); clearLog()">clear</span>
+    </div>
+    <div id="log-body"></div>
+  </div>
+
+<script type="module">
+// ─────────────────────────────────────────────────────────────────────────────
+// nanostores — loaded via UMD global from CDN script tag
+// The CDN build exposes: window.nanostores = { atom, computed, ... }
+// ─────────────────────────────────────────────────────────────────────────────
+const { atom, computed } = window.nanostores;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOCK DATA — simulates what login / layer init would populate
+// ─────────────────────────────────────────────────────────────────────────────
+const MOCK_AGENCY = {
+  agencyName:   "King County Fire District 45",
+  fdid:         "WA-4-03045",
+  agencyCode:   "KCF45",
+  portalUsername: "chief.johnson@kcfd45.wa.gov",
+  defExpression: "AGENCY_CODE = 'KCF45'",
+};
+
+const MOCK_STATIONS = [
+  { stationId: "KCF45-001", label: "Station 45",    address: "19901 SE May Valley Rd" },
+  { stationId: "KCF45-002", label: "Station 45-2",  address: "4520 NE 4th St" },
+  { stationId: "KCF45-003", label: "Station 45-3",  address: "17020 SE Newport Way" },
+];
+
+// drive-mile polygons carry STATION key — proxy targets
+const MOCK_DRIVE_MILES = [
+  { dmId: "DM-001", stationKey: "KCF45-001", label: "DM zone A" },
+  { dmId: "DM-002", stationKey: "KCF45-002", label: "DM zone B" },
+];
+
+const MOCK_SNAPSHOT = {
+  stationCount: 3,
+  hydrantCount: 412,
+  bufferCoverage: "87%",
+  loadedAt: new Date().toISOString(),
+};
+
+const STATION_DETAILS = {
+  "KCF45-001": { hydrants: 186, bufferSqMi: 4.2, driveMiPolygons: 1 },
+  "KCF45-002": { hydrants: 148, bufferSqMi: 3.7, driveMiPolygons: 1 },
+  "KCF45-003": { hydrants:  78, bufferSqMi: 2.1, driveMiPolygons: 0 },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SOURCE ATOMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * $selection — { stationId: string | null }
+ * stationId is the stable STATION key, never OBJECTID.
+ * Agency is NOT a field here; it is the fixed floor set at login.
+ */
+const $selection = atom({ stationId: null });
+
+/**
+ * $agencyContext — set once after OAuth resolves; read-only thereafter.
+ * Contains: agencyName, fdid, agencyCode, portalUsername(s), defExpression.
+ */
+const $agencyContext = atom(null);  // null until login resolves
+
+/**
+ * $panelState — { openRailPanel: 'search'|'layers'|'legend'|'reports'|null }
+ * UI-only. Selection logic must never read this atom.
+ */
+const $panelState = atom({ openRailPanel: null });
+
+/**
+ * $agencySnapshot — session-cached home-state counts + loadedAt.
+ * Cache, not truth. Populated once by StationService after layers init.
+ */
+const $agencySnapshot = atom(null);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPUTED STORES
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * $mode — derived from $selection only.
+ * 'home'    → stationId is null
+ * 'station' → stationId is set
+ * Card stack renders purely from $mode; no card inspects raw selection.
+ */
+const $mode = computed($selection, (sel) =>
+  sel.stationId === null ? "home" : "station"
+);
+
+/**
+ * $breadcrumb — derived from $agencyContext + $selection.
+ * Ordered ribbon entries: [ { label, action? }, ... ]
+ * Ribbon renders this verbatim; its only behaviour is calling actions.
+ */
+const $breadcrumb = computed(
+  [$agencyContext, $selection],
+  (ctx, sel) => {
+    if (!ctx) return [];
+    const crumbs = [
+      {
+        label: ctx.agencyName,
+        action: sel.stationId ? () => SelectionService.clearSelection() : null,
+      },
+    ];
+    if (sel.stationId) {
+      const station = MOCK_STATIONS.find(s => s.stationId === sel.stationId);
+      crumbs.push({
+        label: station ? station.label : sel.stationId,
+        action: null,  // current; no pop-to
+      });
+    }
+    return crumbs;
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELECTION SERVICE — the only writers; components never set atoms directly
+// ─────────────────────────────────────────────────────────────────────────────
+const SelectionService = (() => {
+
+  /**
+   * selectStation(stationId, source)
+   * source: 'map' | 'search' | 'ribbon' | 'list'
+   * Side effects: search/list → zoom (stubbed); map → no re-zoom.
+   */
+  function selectStation(stationId, source = "map") {
+    log(`selectStation("${stationId}", "${source}")`, "action");
+    $selection.set({ stationId });
+
+    // Source-driven side effects (map/zoom stubbed — Task 2 wires real JSAPI)
+    if (source === "search" || source === "list") {
+      sideEffect(`[goTo] zoom to station ${stationId} (source="${source}")`);
+    } else if (source === "map") {
+      sideEffect(`[map click] no re-zoom — feature already visible`);
+    } else if (source === "ribbon") {
+      sideEffect(`[ribbon] pop-to action — no re-zoom`);
+    }
+
+    log(`$selection → ${JSON.stringify($selection.get())}`, "state");
+  }
+
+  /**
+   * clearSelection() — returns to home mode.
+   */
+  function clearSelection() {
+    log(`clearSelection()`, "action");
+    $selection.set({ stationId: null });
+    log(`$selection → ${JSON.stringify($selection.get())}`, "state");
+  }
+
+  /**
+   * setPanel(panelId) — toggles rail panel; closes previous.
+   * UI-only; never read by selection logic.
+   */
+  function setPanel(panelId) {
+    const current = $panelState.get().openRailPanel;
+    const next = current === panelId ? null : panelId;
+    log(`setPanel("${panelId}") → openRailPanel: ${next}`, "action");
+    $panelState.set({ openRailPanel: next });
+  }
+
+  return { selectStation, clearSelection, setPanel };
+})();
+
+// expose globally so inline onclick attrs can reach it
+window.SelectionService = SelectionService;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIMULATE LOGIN — populate $agencyContext and $agencySnapshot
+// ─────────────────────────────────────────────────────────────────────────────
+function simulateLogin() {
+  log("OAuth resolved — setting $agencyContext", "state");
+  $agencyContext.set(MOCK_AGENCY);
+  log("StationService query complete — setting $agencySnapshot", "state");
+  $agencySnapshot.set(MOCK_SNAPSHOT);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RENDERING — subscribe to atoms/computed stores, re-render on change
+// ─────────────────────────────────────────────────────────────────────────────
+
+function renderRibbon() {
+  const ribbon = document.getElementById("ribbon");
+  const crumbs = $breadcrumb.get();
+  const mode   = $mode.get();
+
+  const badge = `<span class="mode-badge ${mode}">${mode === "home" ? "HOME" : "STATION"}</span>`;
+
+  if (crumbs.length === 0) {
+    ribbon.innerHTML = `<span style="color:var(--fph-text-muted);font-size:0.75rem">Authenticating…</span>${badge}`;
+    return;
+  }
+
+  const parts = crumbs.map((c, i) => {
+    const isLast = i === crumbs.length - 1;
+    const sep = i > 0 ? `<span class="ribbon-sep">›</span>` : "";
+    if (isLast || !c.action) {
+      return `${sep}<span class="ribbon-crumb"><button class="active" disabled>${c.label}</button></span>`;
+    }
+    return `${sep}<span class="ribbon-crumb"><button onclick="SelectionService.clearSelection()" title="Back to agency">${c.label}</button></span>`;
+  }).join("");
+
+  ribbon.innerHTML = parts + badge;
+}
+
+function renderRailButtons() {
+  const { openRailPanel } = $panelState.get();
+  document.querySelectorAll(".rail-btn").forEach(btn => {
+    const p = btn.dataset.panel;
+    btn.classList.toggle("active", p === openRailPanel);
+  });
+
+  const leftPanel = document.getElementById("left-panel");
+  leftPanel.classList.toggle("open", openRailPanel !== null);
+}
+
+function renderLeftPanel() {
+  const { openRailPanel } = $panelState.get();
+  const inner = document.getElementById("left-panel-inner");
+  if (!openRailPanel) { inner.innerHTML = ""; return; }
+
+  const titles = { search: "Search", layers: "Layers", legend: "Legend", reports: "Reports" };
+  let content = `<p class="panel-title">${titles[openRailPanel]}</p>`;
+
+  if (openRailPanel === "search") {
+    content += `
+      <input class="search-input" placeholder="Station name or ID…" oninput="handleSearchInput(this.value)" id="search-input" />
+      <div id="search-results"></div>
+    `;
+  } else if (openRailPanel === "layers") {
+    content += MOCK_STATIONS.map(s => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
+        <span>● ${s.label}</span><span style="font-size:0.65rem">visible</span>
+      </div>`).join("") + `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
+        <span>⬡ Hydrant Buffers</span><span style="font-size:0.65rem;color:#a78bfa">display-only</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
+        <span>⬡ Drive Miles</span><span style="font-size:0.65rem">visible</span>
+      </div>`;
+  } else if (openRailPanel === "legend") {
+    content += `
+      <div class="section-label">Stations</div>
+      <div style="font-size:0.75rem;color:var(--fph-text-muted)">● Point feature — selectable</div>
+      <div class="section-label" style="margin-top:0.75rem">Drive Miles</div>
+      <div style="font-size:0.75rem;color:var(--fph-text-muted)">⬡ Polygon — proxy for station</div>
+      <div class="section-label" style="margin-top:0.75rem">Hydrant Buffers</div>
+      <div style="font-size:0.75rem;color:#a78bfa">⬡ Display-only — not selectable</div>`;
+  } else if (openRailPanel === "reports") {
+    content += `<div style="font-size:0.75rem;color:var(--fph-text-muted)">Report generation — Task N (stub)</div>`;
+  }
+
+  inner.innerHTML = content;
+
+  // restore search state if panel was already open
+  if (openRailPanel === "search") {
+    renderSearchResults("");
+  }
+}
+
+window.handleSearchInput = function(val) {
+  renderSearchResults(val);
+};
+
+function renderSearchResults(query) {
+  const el = document.getElementById("search-results");
+  if (!el) return;
+  const q = query.trim().toLowerCase();
+  const matches = q.length === 0
+    ? MOCK_STATIONS
+    : MOCK_STATIONS.filter(s =>
+        s.label.toLowerCase().includes(q) ||
+        s.stationId.toLowerCase().includes(q) ||
+        s.address.toLowerCase().includes(q)
+      );
+
+  if (matches.length === 0) {
+    el.innerHTML = `<p style="font-size:0.75rem;color:var(--fph-text-muted);padding:0.5rem 0">No stations match</p>`;
+    return;
+  }
+
+  el.innerHTML = matches.map(s => `
+    <div class="search-result" onclick="SelectionService.selectStation('${s.stationId}','search')">
+      <div>${s.label}</div>
+      <div class="sr-id">${s.stationId} · ${s.address}</div>
+    </div>`).join("");
+}
+
+function renderCardStack() {
+  const right = document.getElementById("right-panel");
+  const mode  = $mode.get();
+  const ctx   = $agencyContext.get();
+  const snap  = $agencySnapshot.get();
+  const sel   = $selection.get();
+
+  if (!ctx) {
+    right.innerHTML = `<div style="padding:1rem;font-size:0.8rem;color:var(--fph-text-muted)">Authenticating…</div>`;
+    return;
+  }
+
+  if (mode === "home") {
+    right.innerHTML = agencyCardExpanded(ctx, snap);
+  } else {
+    // station mode: AgencyCard collapsed to header strip, then StationCard + RelatedAssetsList
+    const station = MOCK_STATIONS.find(s => s.stationId === sel.stationId);
+    const details = STATION_DETAILS[sel.stationId] || {};
+    right.innerHTML =
+      agencyCardCollapsed(ctx) +
+      stationCard(station, details) +
+      relatedAssetsList(station, details);
+  }
+}
+
+function agencyCardExpanded(ctx, snap) {
+  return `
+    <div class="card expanded">
+      <div class="card-header">
+        <div class="card-icon icon-agency">🏛️</div>
+        <div class="card-title-group">
+          <div class="card-title">${ctx.agencyName}</div>
+          <div class="card-subtitle">FDID ${ctx.fdid}</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="tag-row">
+          <span class="tag">${ctx.agencyCode}</span>
+          <span class="tag">${ctx.portalUsername}</span>
+        </div>
+        ${snap ? `
+        <div class="data-grid" style="margin-top:0.75rem">
+          <div class="data-item"><div class="di-val">${snap.stationCount}</div><div class="di-label">Stations</div></div>
+          <div class="data-item"><div class="di-val">${snap.hydrantCount}</div><div class="di-label">Hydrants</div></div>
+          <div class="data-item"><div class="di-val">${snap.bufferCoverage}</div><div class="di-label">Buffer Cov.</div></div>
+          <div class="data-item"><div class="di-val">${snap.stationCount}</div><div class="di-label">Drive-Mi Zones</div></div>
+        </div>
+        <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.6rem">
+          Snapshot loaded ${new Date(snap.loadedAt).toLocaleTimeString()} — cache, not live
+        </p>` : `<p style="font-size:0.75rem;color:var(--fph-text-muted);margin-top:0.5rem">Loading snapshot…</p>`}
+
+        <div class="section-label" style="margin-top:0.9rem">Stations</div>
+        <ul class="asset-list">
+          ${MOCK_STATIONS.map(s => `
+            <li class="asset-item" style="cursor:pointer" onclick="SelectionService.selectStation('${s.stationId}','list')">
+              <span class="ai-name">${s.label}</span>
+              <span class="ai-count">${s.address}</span>
+            </li>`).join("")}
+        </ul>
+      </div>
+    </div>`;
+}
+
+function agencyCardCollapsed(ctx) {
+  return `
+    <div class="card collapsed-strip">
+      <div class="card-header" onclick="SelectionService.clearSelection()">
+        <div class="card-icon icon-agency">🏛️</div>
+        <div class="card-title-group">
+          <div class="card-title">${ctx.agencyName}</div>
+        </div>
+        <span style="font-size:0.65rem;color:var(--fph-text-muted)">↩ home</span>
+      </div>
+    </div>`;
+}
+
+function stationCard(station, details) {
+  if (!station) return "";
+  return `
+    <div class="card expanded">
+      <div class="card-header">
+        <div class="card-icon icon-station">🚒</div>
+        <div class="card-title-group">
+          <div class="card-title">${station.label}</div>
+          <div class="card-subtitle">${station.address}</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="tag-row">
+          <span class="tag">${station.stationId}</span>
+        </div>
+        <div class="data-grid" style="margin-top:0.75rem">
+          <div class="data-item"><div class="di-val">${details.hydrants ?? "—"}</div><div class="di-label">Hydrants</div></div>
+          <div class="data-item"><div class="di-val">${details.bufferSqMi ?? "—"}</div><div class="di-label">Buffer mi²</div></div>
+          <div class="data-item"><div class="di-val">${details.driveMiPolygons ?? 0}</div><div class="di-label">Drive-Mi Zones</div></div>
+          <div class="data-item"><div class="di-val">—</div><div class="di-label">Apparatus</div></div>
+        </div>
+        <p style="font-size:0.65rem;color:var(--fph-text-muted);margin-top:0.5rem">
+          Attributes loaded from StationService query (Task 2)
+        </p>
+      </div>
+    </div>`;
+}
+
+function relatedAssetsList(station, details) {
+  if (!station) return "";
+  return `
+    <div class="card expanded">
+      <div class="card-header">
+        <div class="card-icon icon-assets">⬡</div>
+        <div class="card-title-group">
+          <div class="card-title">Related Assets</div>
+          <div class="card-subtitle">for ${station.label}</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <ul class="asset-list">
+          <li class="asset-item">
+            <span class="ai-name">Hydrant buffers</span>
+            <span class="ai-count">${details.hydrants ?? "—"}</span>
+          </li>
+          <li class="asset-item" style="opacity:0.55">
+            <span class="ai-name">Drive-mile polygons</span>
+            <span class="ai-count">${details.driveMiPolygons ?? 0}</span>
+          </li>
+          <li class="asset-item" style="opacity:0.35">
+            <span class="ai-name">Apparatus / CP feed</span>
+            <span class="ai-count" style="color:#a78bfa">v2 scope</span>
+          </li>
+        </ul>
+        <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.6rem">
+          Hydrant buffers: display-only — no stable key (regenerated monthly)
+        </p>
+      </div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WIRE UP SIMULATION BUTTONS
+// ─────────────────────────────────────────────────────────────────────────────
+function buildSimButtons() {
+  const stationContainer  = document.getElementById("station-btns");
+  const driveMileContainer = document.getElementById("drivemile-btns");
+
+  stationContainer.innerHTML = MOCK_STATIONS.map(s => `
+    <button class="sim-btn" id="sim-${s.stationId}"
+      onclick="SelectionService.selectStation('${s.stationId}','map')">
+      📍 ${s.label}
+    </button>`).join("") + `
+    <button class="sim-btn" style="color:var(--fph-accent)" onclick="SelectionService.clearSelection()">
+      ✕ Clear
+    </button>`;
+
+  driveMileContainer.innerHTML = MOCK_DRIVE_MILES.map(dm => `
+    <button class="sim-btn drive-mile-sim" id="sim-dm-${dm.dmId}"
+      onclick="SelectionService.selectStation('${dm.stationKey}','map')">
+      ⬡ ${dm.label} → ${dm.stationKey}
+    </button>`).join("");
+}
+
+function syncSimButtonHighlight() {
+  const sel = $selection.get();
+  document.querySelectorAll(".sim-btn").forEach(b => b.classList.remove("selected"));
+  if (sel.stationId) {
+    const btn = document.getElementById(`sim-${sel.stationId}`);
+    if (btn) btn.classList.add("selected");
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEV LOG HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function log(msg, type = "") {
+  const el = document.getElementById("log-body");
+  const ts = new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const div = document.createElement("div");
+  div.className = `log-entry ${type}`;
+  div.textContent = `${ts}  ${msg}`;
+  el.prepend(div);
+}
+
+function sideEffect(msg) {
+  log(`  ↳ STUB: ${msg}`, "stub");
+}
+
+window.toggleLog = function() {
+  const body = document.getElementById("log-body");
+  body.style.display = body.style.display === "none" ? "" : "none";
+};
+
+window.clearLog = function() {
+  document.getElementById("log-body").innerHTML = "";
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUBSCRIPTIONS — re-render on any relevant store change
+// ─────────────────────────────────────────────────────────────────────────────
+$breadcrumb.subscribe(renderRibbon);
+$mode.subscribe(renderCardStack);
+$agencyContext.subscribe(renderCardStack);
+$agencySnapshot.subscribe(renderCardStack);
+$panelState.subscribe(() => {
+  renderRailButtons();
+  renderLeftPanel();
+});
+$selection.subscribe(syncSimButtonHighlight);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────────────────────────────────────
+buildSimButtons();
+renderRibbon();       // shows "Authenticating…" until login resolves
+renderCardStack();
+
+// simulate async OAuth + StationService (500ms)
+setTimeout(() => {
+  simulateLogin();
+  log("App ready", "state");
+}, 500);
+</script>
+</body>
+</html>
