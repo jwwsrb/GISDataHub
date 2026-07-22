@@ -508,8 +508,10 @@ const { atom, computed } = window.nanostores;
 // ─────────────────────────────────────────────────────────────────────────────
 // LAYER URLs
 // ─────────────────────────────────────────────────────────────────────────────
-const STATIONS_URL   = "https://gisent-qa-ds.wsrb.com:6443/arcgis/rest/services/WSRBDataLayers/Fire_Protection/FeatureServer/0";
-const DRIVE_MILE_URL = "https://gisent-qa-ds.wsrb.com:6443/arcgis/rest/services/WSRBDataLayers/Fire_Protection/FeatureServer/7";
+const AGOL_CLIENT_ID = "tS3sgaCh7cedVjCu";
+const AGOL_PORTAL   = "https://wsrb.maps.arcgis.com/";
+const STATIONS_URL   = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Fire_Stations/FeatureServer/0";
+const DRIVE_MILE_URL = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Drive_Mile_Disks/FeatureServer/1";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK AGENCY DATA — replace with real OAuth lookup when wiring login
@@ -1037,11 +1039,26 @@ renderRibbon();
 renderCardStack();
 
 require([
+  "esri/identity/OAuthInfo",
+  "esri/identity/IdentityManager",
   "esri/layers/FeatureLayer",
   "esri/Map",
   "esri/views/MapView",
   "esri/widgets/Zoom",
-], function(FeatureLayer, Map, MapView, Zoom) {
+], function(OAuthInfo, esriId, FeatureLayer, Map, MapView, Zoom) {
+
+  // ── OAuth ─────────────────────────────────────────────────────────
+  const oauthInfo = new OAuthInfo({
+    appId: AGOL_CLIENT_ID,
+    portalUrl: AGOL_PORTAL,
+    popup: false,   // redirect flow
+  });
+  esriId.registerOAuthInfos([oauthInfo]);
+
+  // Check for existing session, prompt login if none
+  esriId.checkSignInStatus(AGOL_PORTAL + "sharing").catch(() => {
+    esriId.getCredential(AGOL_PORTAL + "sharing");
+  });
 
   // ── Layers ────────────────────────────────────────────────────────
   const stationsLayer = new FeatureLayer({
