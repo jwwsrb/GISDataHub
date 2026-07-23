@@ -521,7 +521,7 @@ const MOCK_AGENCY = {
   fdid:           "WA-4-03045",
   agencyCode:     "KCF45",
   portalUsername: "chief.johnson@kcfd45.wa.gov",
-  defExpression:  "AGENCY_CODE = 'KCF45'",
+  defExpression:  "FIRE_PROTE = 'KING COUNTY FIRE DISTRICT 45'",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -725,7 +725,7 @@ const StationService = (() => {
     try {
       const result = await _stationsLayer.queryFeatures({
         where: defExpression || "1=1",
-        outFields: ["STATION", "STATION_NAME", "ADDRESS"],
+        outFields: ["STATION", "STATION_NAME", "ADDRESS", "FIRE_PROTE"],
         returnGeometry: false,
         orderByFields: ["STATION"],
       });
