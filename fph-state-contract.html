@@ -1151,7 +1151,7 @@ require([
   const view = new MapView({
     container: "the-map",
     map,
-    center: [-122.3, 47.5],
+    center: [-120.5, 47.5],  // center of WA — replaced by queryExtent after login
     zoom: 7,
   });
 
@@ -1184,8 +1184,14 @@ require([
       await StationService.loadSnapshot(ctx.defExpression);
       renderCardStack();
 
-      // Zoom to agency extent
-      await view.goTo(stationsLayer.fullExtent);
+      // Zoom to agency extent — query actual features, not fullExtent
+      // (fullExtent reflects the whole service regardless of definitionExpression)
+      const extentResult = await stationsLayer.queryExtent({
+        where: ctx.defExpression,
+      });
+      if (extentResult.extent) {
+        await view.goTo(extentResult.extent.expand(1.5));
+      }
 
       log("App ready", "state");
 
