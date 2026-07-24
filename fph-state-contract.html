@@ -573,7 +573,10 @@ function renderRibbon() {
   ribbon.innerHTML = parts + badge;
 }
 
+let _renderCount = 0;
 function renderCardStack() {
+  _renderCount++;
+  log(`renderCardStack #${_renderCount} mode=${$mode.get()}`, "side");
   const right = document.getElementById("right-panel");
   const mode  = $mode.get();
   const ctx   = $agencyContext.get();
