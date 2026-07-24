@@ -288,7 +288,7 @@ const makeFPDLabelClass = (size = 10) => new LabelClass({
   labelExpressionInfo: { expression: `$feature.fpd_desc` },
   symbol: {
     type: "text", color: [168, 0, 0, 199], haloColor: [252, 250, 250], haloSize: 2,
-    font: { family: "Avenir Next", weight: "bold", size },
+    font: { family: "Arial", weight: "bold", size },
   },
   labelPlacement: "always-horizontal",
 });
@@ -316,7 +316,7 @@ const makeStationLabelClass = (size = 11) => new LabelClass({
   labelExpressionInfo: { expression: `$feature["StationName"]` },
   symbol: {
     type: "text", color: [60, 60, 60], haloColor: [255, 255, 255], haloSize: 1.5,
-    font: { family: "Avenir Next", style: "normal", weight: "bold", size },
+    font: { family: "Arial", style: "normal", weight: "bold", size },
     xoffset: -8, yoffset: 11,
   },
   labelPlacement: "center-right",
@@ -592,8 +592,6 @@ function renderCardStack() {
 function agencyCardExpanded(ctx, snap) {
   const stations     = StationService.getStations();
   const autoAid      = StationService.getAutoAidStations();
-  const stn  = n => `${n} ${n === 1 ? "Station" : "Stations"}`;
-  const aid  = n => `${n} Auto Aid ${n === 1 ? "Station" : "Stations"}`;
 
   const stationList = (list, section) => !list.length ? "" : `
     <div class="section-label" style="margin-top:0.9rem">${section}</div>
@@ -624,11 +622,11 @@ function agencyCardExpanded(ctx, snap) {
         <div class="data-grid" style="margin-top:0.5rem">
           <div class="data-item">
             <div class="di-val">${snap.stationCount}</div>
-            <div class="di-label">${stn(snap.stationCount)}</div>
+            <div class="di-label">Agency Stations</div>
           </div>
           <div class="data-item">
             <div class="di-val">${snap.autoAidCount ?? "—"}</div>
-            <div class="di-label">${snap.autoAidCount != null ? aid(snap.autoAidCount) : "Auto Aid"}</div>
+            <div class="di-label">Auto Aid Stations</div>
           </div>
         </div>
         <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.5rem">
@@ -819,7 +817,12 @@ mapEl.addEventListener("arcgisViewReadyChange", async () => {
     stationsLayer.definitionExpression    = ctx.defExpression;
     autoAidLayer.definitionExpression     = ctx.autoAidExpr;
     driveMiLayer.definitionExpression     = ctx.defExpression;
-    hydrantBufLayer.definitionExpression  = ctx.fpdDefExpression;
+
+    // Hydrant buffers — spatial filter using agency boundary geometry
+    // No field-based filter available; geometry intersection scopes to agency area
+    if (ctx.agencyGeometry) {
+      hydrantBufLayer.geometryDefinition = ctx.agencyGeometry;
+    }
 
     // Draw agency boundary (thick dark-red outline, no fill — Option B)
     if (ctx.agencyGeometry) {
