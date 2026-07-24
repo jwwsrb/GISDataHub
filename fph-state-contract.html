@@ -675,8 +675,9 @@ const MapService = (() => {
         r => r.layer === _driveMiLayer
       );
       if (driveMiHit) {
+        log(`hit: drive-mile attrs = ${JSON.stringify(driveMiHit.graphic.attributes)}`, "side");
         const stationId = driveMiHit.graphic.attributes["Station"];
-        log(`hit: drive-mile layer → proxying STATION="${stationId}"`, "action");
+        log(`hit: drive-mile layer → proxying Station="${stationId}"`, "action");
         SelectionService.selectStation(stationId, "map");
         return;
       }
@@ -1126,15 +1127,17 @@ require([
   });
   esriId.registerOAuthInfos([oauthInfo]);
 
-  // ── Layers (no defExpression yet — set after login resolves) ──────
+  // ── Layers (1=2 until login resolves — prevents statewide flash) ──
   const stationsLayer = new FeatureLayer({
     url: STATIONS_URL,
+    definitionExpression: "1=2",
     outFields: ["Station", "StationName", "DIST1"],
     popupEnabled: false,
   });
 
   const driveMiLayer = new FeatureLayer({
     url: DRIVE_MILE_URL,
+    definitionExpression: "1=2",
     outFields: ["Station", "DIST1"],
     popupEnabled: false,
   });
