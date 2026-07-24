@@ -58,7 +58,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: var(--calcite-font-family, "Avenir Next", "Avenir", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
       background: #f5f5f5;
       color: var(--fph-text);
       height: 100dvh;
@@ -287,7 +287,7 @@ const makeFPDLabelClass = (size = 10) => new LabelClass({
   labelExpressionInfo: { expression: `$feature.fpd_desc` },
   symbol: {
     type: "text", color: [168, 0, 0, 199], haloColor: [252, 250, 250], haloSize: 2,
-    font: { family: "Roboto", weight: "bold", size },
+    font: { family: "Avenir Next", weight: "bold", size },
   },
   labelPlacement: "always-horizontal",
 });
@@ -311,11 +311,11 @@ const STATION_RENDERER = {
 };
 
 // Station labels — Arial, offset above symbol; smaller for auto-aid
-const makeStationLabelClass = (size = 13) => new LabelClass({
-  labelExpressionInfo: { expression: `$feature["StationName"] + " (" + $feature["Station"] + ")"` },
+const makeStationLabelClass = (size = 11) => new LabelClass({
+  labelExpressionInfo: { expression: `$feature["StationName"]` },
   symbol: {
     type: "text", color: [60, 60, 60], haloColor: [255, 255, 255], haloSize: 1.5,
-    font: { family: "Roboto", style: "normal", weight: "bold", size },
+    font: { family: "Avenir Next", style: "normal", weight: "bold", size },
     xoffset: -8, yoffset: 11,
   },
   labelPlacement: "center-right",
@@ -698,7 +698,7 @@ const stationsLayer = new FeatureLayer({
   definitionExpression: "1=2",
   outFields:            ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
   labelsVisible:        true,
-  labelingInfo:         [makeStationLabelClass(13)],
+  labelingInfo:         [makeStationLabelClass(11)],
   renderer:             STATION_RENDERER,
   popupEnabled:         false,
 });
@@ -709,7 +709,7 @@ const autoAidLayer = new FeatureLayer({
   definitionExpression: "1=2",
   outFields:            ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
   labelsVisible:        true,
-  labelingInfo:         [makeStationLabelClass(11)],
+  labelingInfo:         [makeStationLabelClass(9)],
   opacity:              0.5,
   renderer:             STATION_RENDERER,
   popupEnabled:         false,
@@ -720,7 +720,7 @@ const driveMiLayer = new FeatureLayer({
   title:                "Drive Mile Coverage",
   definitionExpression: "1=2",
   outFields:            ["Station", "DIST1", "tobreak"],
-  opacity:              0.35,
+  opacity:              0.5,
   renderer:             DRIVE_MILE_RENDERER,
   popupEnabled:         false,
 });
