@@ -228,7 +228,8 @@ const AGOL_PORTAL       = "https://wsrb.maps.arcgis.com/";
 const STATIONS_URL      = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Fire_Stations/FeatureServer/0";
 const DRIVE_MILE_URL    = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Drive_Mile_Disks/FeatureServer/1";
 const FPD_URL           = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/FPD_Boundaries/FeatureServer/0";
-const USERNAMES_ITEM_ID = "a634dbad39de45ffb555381018c64892";
+const USERNAMES_ITEM_ID  = "a634dbad39de45ffb555381018c64892";
+const HYDRANT_BUF_URL    = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Hydrant_Buffers_1000_Feet/FeatureServer/2";
 const sqlQuote = s => `'${s.replace(/'/g, "''")}'`;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -330,7 +331,7 @@ esriId.registerOAuthInfos([oauthInfo]);
 // ─────────────────────────────────────────────────────────────────────────────
 // SOURCE ATOMS
 // ─────────────────────────────────────────────────────────────────────────────
-const $selection      = atom({ stationId: null, label: "", district: "" });
+const $selection      = atom({ stationId: null, label: "", district: "", address: "" });
 const $agencyContext  = atom(null);
 const $agencySnapshot = atom(null);
 
@@ -427,7 +428,7 @@ const MapService = (() => {
       const oid      = stationHit.graphic.attributes[oidField];
       try {
         const result = await _stationsLayer.queryFeatures({
-          objectIds: [oid], outFields: ["Station", "StationName", "FIRE_DISTRICT"], returnGeometry: false,
+          objectIds: [oid], outFields: ["Station", "StationName", "FIRE_DISTRICT", "StationAddress"], returnGeometry: false,
         });
         const attrs     = result.features[0]?.attributes;
         const stationId = attrs?.["Station"];
@@ -435,6 +436,7 @@ const MapService = (() => {
         SelectionService.selectStation(stationId, "map", {
           label:    attrs?.["StationName"] || stationId,
           district: attrs?.["FIRE_DISTRICT"] || "",
+          address:  attrs?.["StationAddress"] || "",
         });
       } catch(e) { log(`hit: query failed: ${e.message}`, "side"); }
     });
@@ -470,13 +472,13 @@ const MapService = (() => {
 const SelectionService = {
   selectStation(stationId, source = "map", display = {}) {
     log(`selectStation("${stationId}", source="${source}")`, "action");
-    $selection.set({ stationId, label: display.label || stationId, district: display.district || "" });
+    $selection.set({ stationId, label: display.label || stationId, district: display.district || "", address: display.address || "" });
     MapService.highlightStation(stationId);
     if (source === "search" || source === "list") MapService.goToStation(stationId);
   },
   clearSelection() {
     log("clearSelection()", "action");
-    $selection.set({ stationId: null, label: "", district: "" });
+    $selection.set({ stationId: null, label: "", district: "", address: "" });
     MapService.clearHighlight();
   },
 };
@@ -484,7 +486,7 @@ window.SelectionService = SelectionService;
 window.handleStationClick = (el) => {
   SelectionService.selectStation(
     el.dataset.id, "list",
-    { label: el.dataset.label, district: el.dataset.district }
+    { label: el.dataset.label, district: el.dataset.district, address: el.dataset.address }
   );
 };
 
@@ -492,28 +494,64 @@ window.handleStationClick = (el) => {
 // STATION SERVICE
 // ─────────────────────────────────────────────────────────────────────────────
 const StationService = (() => {
-  let _layer = null, _stations = [];
-  function init(layer) { _layer = layer; }
-  async function loadAgencyStations(expr) {
+  let _layer = null, _autoAidLayer = null;
+  let _stations = [], _autoAidStations = [];
+
+  function init(layer, autoAidLayer) {
+    _layer = layer;
+    _autoAidLayer = autoAidLayer;
+  }
+
+  async function loadAgencyStations(expr, autoAidExpr) {
     try {
-      const r = await _layer.queryFeatures({ where: expr || "1=1", outFields: ["Station","StationName","FIRE_DISTRICT"], returnGeometry: false });
+      const r = await _layer.queryFeatures({
+        where: expr || "1=1",
+        outFields: ["Station","StationName","FIRE_DISTRICT","StationAddress"],
+        returnGeometry: false,
+      });
       _stations = r.features.map(f => ({
         stationId: f.attributes["Station"],
         label:     f.attributes["StationName"] || f.attributes["Station"],
         district:  f.attributes["FIRE_DISTRICT"] || "",
+        address:   f.attributes["StationAddress"] || "",
       }));
-      log(`StationService: ${_stations.length} stations loaded`, "state");
-    } catch(e) { log(`StationService failed: ${e.message}`, "side"); }
-  }
-  async function loadSnapshot(expr) {
+      log(`StationService: ${_stations.length} primary stations loaded`, "state");
+    } catch(e) { log(`StationService primary failed: ${e.message}`, "side"); }
+
     try {
-      const count = await _layer.queryFeatureCount({ where: expr || "1=1" });
-      $agencySnapshot.set({ stationCount: count, hydrantCount: "—", bufferCoverage: "—", loadedAt: new Date().toISOString() });
-      log(`StationService: snapshot set (${count} stations)`, "state");
+      const r = await _autoAidLayer.queryFeatures({
+        where: autoAidExpr || "1=1",
+        outFields: ["Station","StationName","FIRE_DISTRICT","StationAddress"],
+        returnGeometry: false,
+      });
+      _autoAidStations = r.features.map(f => ({
+        stationId: f.attributes["Station"],
+        label:     f.attributes["StationName"] || f.attributes["Station"],
+        district:  f.attributes["FIRE_DISTRICT"] || "",
+        address:   f.attributes["StationAddress"] || "",
+      }));
+      log(`StationService: ${_autoAidStations.length} auto-aid stations loaded`, "state");
+    } catch(e) { log(`StationService auto-aid failed: ${e.message}`, "side"); }
+  }
+
+  async function loadSnapshot(expr, autoAidExpr) {
+    try {
+      const [primaryCount, autoAidCount] = await Promise.all([
+        _layer.queryFeatureCount({ where: expr || "1=1" }),
+        _autoAidLayer.queryFeatureCount({ where: autoAidExpr || "1=1" }),
+      ]);
+      $agencySnapshot.set({
+        stationCount:    primaryCount,
+        autoAidCount,
+        loadedAt: new Date().toISOString(),
+      });
+      log(`StationService: snapshot set (${primaryCount} primary, ${autoAidCount} auto-aid)`, "state");
     } catch(e) { log(`StationService snapshot failed: ${e.message}`, "side"); }
   }
-  function getStations() { return _stations; }
-  return { init, loadAgencyStations, loadSnapshot, getStations };
+
+  function getStations()        { return _stations; }
+  function getAutoAidStations() { return _autoAidStations; }
+  return { init, loadAgencyStations, loadSnapshot, getStations, getAutoAidStations };
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -546,13 +584,32 @@ function renderCardStack() {
   if (mode === "home") {
     right.innerHTML = agencyCardExpanded(ctx, snap);
   } else {
-    const station = { stationId: sel.stationId, label: sel.label || sel.stationId, district: sel.district || "" };
+    const station = { stationId: sel.stationId, label: sel.label || sel.stationId, district: sel.district || "", address: sel.address || "" };
     right.innerHTML = agencyCardCollapsed(ctx) + stationCard(station) + relatedAssetsList(station);
   }
 }
 
 function agencyCardExpanded(ctx, snap) {
-  const stations = StationService.getStations();
+  const stations     = StationService.getStations();
+  const autoAid      = StationService.getAutoAidStations();
+  const stn  = n => `${n} ${n === 1 ? "Station" : "Stations"}`;
+  const aid  = n => `${n} Auto Aid ${n === 1 ? "Station" : "Stations"}`;
+
+  const stationList = (list, section) => !list.length ? "" : `
+    <div class="section-label" style="margin-top:0.9rem">${section}</div>
+    <ul class="asset-list">
+      ${list.map(s => `
+        <li class="asset-item" style="cursor:pointer"
+            data-id="${s.stationId}"
+            data-label="${s.label.replace(/"/g, '&quot;')}"
+            data-district="${s.district.replace(/"/g, '&quot;')}"
+            data-address="${s.address.replace(/"/g, '&quot;')}"
+            onclick="handleStationClick(this)">
+          <span class="ai-name">${s.label}</span>
+          <span class="ai-count" style="font-size:0.65rem">${s.district}</span>
+        </li>`).join("")}
+    </ul>`;
+
   return `
     <div class="card expanded">
       <div class="card-header">
@@ -565,27 +622,20 @@ function agencyCardExpanded(ctx, snap) {
       <div class="card-body">
         ${snap ? `
         <div class="data-grid" style="margin-top:0.5rem">
-          <div class="data-item"><div class="di-val">${snap.stationCount}</div><div class="di-label">Stations</div></div>
-          <div class="data-item"><div class="di-val">${snap.hydrantCount}</div><div class="di-label">Hydrants</div></div>
-          <div class="data-item"><div class="di-val">${snap.bufferCoverage}</div><div class="di-label">Buffer Cov.</div></div>
-          <div class="data-item"><div class="di-val">—</div><div class="di-label">Drive-Mi Zones</div></div>
+          <div class="data-item">
+            <div class="di-val">${snap.stationCount}</div>
+            <div class="di-label">${stn(snap.stationCount)}</div>
+          </div>
+          <div class="data-item">
+            <div class="di-val">${snap.autoAidCount ?? "—"}</div>
+            <div class="di-label">${snap.autoAidCount != null ? aid(snap.autoAidCount) : "Auto Aid"}</div>
+          </div>
         </div>
         <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.5rem">
           Snapshot ${new Date(snap.loadedAt).toLocaleTimeString()} — cache, not live
         </p>` : `<p style="font-size:0.75rem;color:var(--fph-text-muted);margin-top:0.5rem">Loading data…</p>`}
-        ${stations.length ? `
-        <div class="section-label" style="margin-top:0.9rem">Stations</div>
-        <ul class="asset-list" id="station-list">
-          ${stations.map(s => `
-            <li class="asset-item" style="cursor:pointer"
-                data-id="${s.stationId}"
-                data-label="${s.label.replace(/"/g, '&quot;')}"
-                data-district="${s.district.replace(/"/g, '&quot;')}"
-                onclick="handleStationClick(this)">
-              <span class="ai-name">${s.label}</span>
-              <span class="ai-count">${s.district}</span>
-            </li>`).join("")}
-        </ul>` : ""}
+        ${stationList(stations, "Stations")}
+        ${stationList(autoAid, "Auto Aid Stations")}
       </div>
     </div>`;
 }
@@ -612,14 +662,13 @@ function stationCard(station) {
         </div>
       </div>
       <div class="card-body">
-        <div class="data-grid" style="margin-top:0.5rem">
-          <div class="data-item"><div class="di-val">—</div><div class="di-label">Hydrants</div></div>
-          <div class="data-item"><div class="di-val">—</div><div class="di-label">Buffer mi²</div></div>
-          <div class="data-item"><div class="di-val">—</div><div class="di-label">Drive-Mi Zones</div></div>
-          <div class="data-item"><div class="di-val">—</div><div class="di-label">Apparatus</div></div>
-        </div>
-        <p style="font-size:0.65rem;color:var(--fph-text-muted);margin-top:0.5rem">
-          Detail queries wired in StationService (future task)
+        ${station.address ? `
+        <div class="data-item" style="margin-top:0.5rem">
+          <div class="di-label">Address</div>
+          <div style="font-size:0.78rem;color:var(--fph-text);margin-top:0.2rem">${properCase(station.address)}</div>
+        </div>` : ""}
+        <p style="font-size:0.65rem;color:var(--fph-text-muted);margin-top:0.75rem">
+          Detail queries (hydrants, drive miles, apparatus) — future task
         </p>
       </div>
     </div>`;
@@ -715,6 +764,23 @@ const autoAidLayer = new FeatureLayer({
   popupEnabled:         false,
 });
 
+const hydrantBufLayer = new FeatureLayer({
+  url:          HYDRANT_BUF_URL,
+  title:        "Hydrant Buffers (1000 ft)",
+  visible:      false,
+  minScale:     150000,
+  opacity:      0.32,
+  popupEnabled: false,
+  renderer: {
+    type:   "simple",
+    symbol: {
+      type:    "simple-fill",
+      color:   [197, 225, 240],
+      outline: { color: [0, 40, 100], width: 2 },
+    },
+  },
+});
+
 const driveMiLayer = new FeatureLayer({
   url:                  DRIVE_MILE_URL,
   title:                "Drive Mile Coverage",
@@ -731,11 +797,11 @@ const mapEl = document.getElementById("the-map");
 mapEl.addEventListener("arcgisViewReadyChange", async () => {
   const view = mapEl.view;
 
-  // Layer draw order (bottom → top): drive miles, FPD, agency boundary, auto-aid, stations
-  view.map.addMany([driveMiLayer, fpdLayer, agencyBoundaryLayer, autoAidLayer, stationsLayer]);
+  // Layer draw order (bottom → top): hydrant buffers, drive miles, FPD, agency boundary, auto-aid, stations
+  view.map.addMany([hydrantBufLayer, driveMiLayer, fpdLayer, agencyBoundaryLayer, autoAidLayer, stationsLayer]);
 
   MapService.init(view, stationsLayer);
-  StationService.init(stationsLayer);
+  StationService.init(stationsLayer, autoAidLayer);
 
   log("View ready", "state");
 
@@ -749,10 +815,11 @@ mapEl.addEventListener("arcgisViewReadyChange", async () => {
     const ctx = await resolveAgency(portalUsername);
 
     // Apply definition expressions
-    fpdLayer.definitionExpression      = ctx.fpdDefExpression;
-    stationsLayer.definitionExpression = ctx.defExpression;
-    autoAidLayer.definitionExpression  = ctx.autoAidExpr;
-    driveMiLayer.definitionExpression  = ctx.defExpression;
+    fpdLayer.definitionExpression         = ctx.fpdDefExpression;
+    stationsLayer.definitionExpression    = ctx.defExpression;
+    autoAidLayer.definitionExpression     = ctx.autoAidExpr;
+    driveMiLayer.definitionExpression     = ctx.defExpression;
+    hydrantBufLayer.definitionExpression  = ctx.fpdDefExpression;
 
     // Draw agency boundary (thick dark-red outline, no fill — Option B)
     if (ctx.agencyGeometry) {
@@ -771,8 +838,8 @@ mapEl.addEventListener("arcgisViewReadyChange", async () => {
     log(`$agencyContext set for "${ctx.agencyName}"`, "state");
 
     // Load station list + snapshot
-    await StationService.loadAgencyStations(ctx.defExpression);
-    await StationService.loadSnapshot(ctx.defExpression);
+    await StationService.loadAgencyStations(ctx.defExpression, ctx.autoAidExpr);
+    await StationService.loadSnapshot(ctx.defExpression, ctx.autoAidExpr);
     renderCardStack();
 
     log("App ready", "state");
