@@ -510,8 +510,6 @@ const StationService = (() => {
         returnGeometry: false,
       });
       const seen = new Set();
-      const rawIds = r.features.map(f => f.attributes["Station"]);
-      log(`StationService: raw Station IDs = ${JSON.stringify(rawIds)}`, "side");
       _stations = r.features
         .map(f => ({
           stationId: String(f.attributes["Station"]).trim(),
@@ -573,10 +571,7 @@ function renderRibbon() {
   ribbon.innerHTML = parts + badge;
 }
 
-let _renderCount = 0;
 function renderCardStack() {
-  _renderCount++;
-  log(`renderCardStack #${_renderCount} mode=${$mode.get()}`, "side");
   const right = document.getElementById("right-panel");
   const mode  = $mode.get();
   const ctx   = $agencyContext.get();
@@ -596,7 +591,6 @@ function renderCardStack() {
 function agencyCardExpanded(ctx, snap) {
   const stations     = StationService.getStations();
   const autoAid      = StationService.getAutoAidStations();
-  log(`agencyCardExpanded: ${stations.length} stations, ${autoAid.length} auto-aid`, "side");
 
   const stationList = (list, section) => !list.length ? "" : `
     <div class="section-label" style="margin-top:0.9rem">${section}</div>
@@ -608,7 +602,7 @@ function agencyCardExpanded(ctx, snap) {
             data-district="${s.district.replace(/"/g, '&quot;')}"
             data-address="${s.address.replace(/"/g, '&quot;')}"
             onclick="handleStationClick(this)">
-          <span class="ai-name">${s.label} <span style="font-size:0.65rem;color:var(--fph-text-muted)">(${s.stationId})</span></span>
+          <span class="ai-name">${s.label}</span>
           <span class="ai-count" style="font-size:0.65rem">${s.district}</span>
         </li>`).join("")}
     </ul>`;
