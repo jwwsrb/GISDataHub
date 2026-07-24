@@ -635,17 +635,22 @@ const MapService = (() => {
     _view.on("click", async (event) => {
       const hitResult = await _view.hitTest(event, {
         include: [_stationsLayer],
+        tolerance: 6,  // pixels — default is 13, tighter reduces accidental hits
       });
 
-      if (!hitResult.results.length) {
-        SelectionService.clearSelection();
-        return;
-      }
-
-      // Only stations are selectable — query by OBJECTID to get Station key
+      // Only clear selection on a true empty click (no station hit)
       const stationHit = hitResult.results.find(
         r => r.layer === _stationsLayer
       );
+
+      if (!stationHit) {
+        // Don't clear on every non-station click — only if nothing was hit at all
+        // (drive mile / hydrant buffer clicks fall through silently)
+        if (!hitResult.results.length) {
+          SelectionService.clearSelection();
+        }
+        return;
+      }
       if (stationHit) {
         const oidField = _stationsLayer.objectIdField || "OBJECTID";
         const oid = stationHit.graphic.attributes[oidField];
