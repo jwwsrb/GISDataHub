@@ -583,8 +583,8 @@ const AgencyService = (() => {
 // SOURCE ATOMS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** { stationId: string | null } — stable Station key (mixed case), never OBJECTID */
-const $selection = atom({ stationId: null });
+/** { stationId: string | null, label: string, district: string } — stable Station key, never OBJECTID */
+const $selection = atom({ stationId: null, label: "", district: "" });
 
 /** Set once after OAuth resolves; read-only after */
 const $agencyContext = atom(null);
@@ -659,14 +659,16 @@ const MapService = (() => {
         try {
           const result = await _stationsLayer.queryFeatures({
             objectIds: [oid],
-            outFields: ["*"],
+            outFields: ["Station", "StationName", "FIRE_DISTRICT"],
             returnGeometry: false,
           });
           const attrs = result.features[0]?.attributes;
-          log(`hit: station attrs = ${JSON.stringify(attrs)}`, "side");
           const stationId = attrs?.["Station"];
           log(`hit: station layer → Station="${stationId}"`, "action");
-          SelectionService.selectStation(stationId, "map");
+          SelectionService.selectStation(stationId, "map", {
+            label:    attrs?.["StationName"] || stationId,
+            district: attrs?.["FIRE_DISTRICT"] || "",
+          });
         } catch(e) {
           log(`hit: station attribute query failed: ${e.message}`, "side");
         }
@@ -737,9 +739,9 @@ const SelectionService = (() => {
    * search/list → highlight + goTo
    * ribbon    → highlight only
    */
-  function selectStation(stationId, source = "map") {
+  function selectStation(stationId, source = "map", display = {}) {
     log(`selectStation("${stationId}", source="${source}")`, "action");
-    $selection.set({ stationId });
+    $selection.set({ stationId, label: display.label || stationId, district: display.district || "" });
 
     MapService.highlightStation(stationId);
 
@@ -753,7 +755,7 @@ const SelectionService = (() => {
   /** Return to home mode */
   function clearSelection() {
     log("clearSelection()", "action");
-    $selection.set({ stationId: null });
+    $selection.set({ stationId: null, label: "", district: "" });
     MapService.clearHighlight();
     log(`$selection → ${JSON.stringify($selection.get())}`, "state");
   }
@@ -787,12 +789,13 @@ const StationService = (() => {
     try {
       const result = await _stationsLayer.queryFeatures({
         where: defExpression || "1=1",
-        outFields: ["Station", "StationName", "DIST1"],
+        outFields: ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
         returnGeometry: false,
       });
       _stations = result.features.map(f => ({
         stationId: f.attributes["Station"],
         label:     f.attributes["StationName"] || f.attributes["Station"],
+        district:  f.attributes["FIRE_DISTRICT"] || "",
         address:   f.attributes["DIST1"] || "",
       }));
       log(`StationService: loaded ${_stations.length} stations`, "state");
@@ -915,8 +918,7 @@ function renderSearchResults(query) {
     ? stations
     : stations.filter(s =>
         s.label.toLowerCase().includes(q) ||
-        s.stationId.toLowerCase().includes(q) ||
-        s.address.toLowerCase().includes(q)
+        s.stationId.toLowerCase().includes(q)
       );
 
   if (!matches.length) {
@@ -924,9 +926,9 @@ function renderSearchResults(query) {
     return;
   }
   el.innerHTML = matches.map(s => `
-    <div class="search-result" onclick="SelectionService.selectStation('${s.stationId}','search')">
+    <div class="search-result" onclick="SelectionService.selectStation('${s.stationId}','search',{label:'${s.label.replace(/'/g,"\\'")}',district:'${s.district.replace(/'/g,"\\'")}' })">
       <div>${s.label}</div>
-      <div class="sr-id">${s.stationId}${s.address ? " · " + s.address : ""}</div>
+      <div class="sr-id">${s.district}</div>
     </div>`).join("");
 }
 
@@ -945,9 +947,11 @@ function renderCardStack() {
   if (mode === "home") {
     right.innerHTML = agencyCardExpanded(ctx, snap);
   } else {
-    const stations = StationService.getStations();
-    const station  = stations.find(s => s.stationId === sel.stationId)
-                     || { stationId: sel.stationId, label: sel.stationId, address: "" };
+    const station = {
+      stationId: sel.stationId,
+      label:     sel.label || sel.stationId,
+      district:  sel.district || "",
+    };
     right.innerHTML = agencyCardCollapsed(ctx) + stationCard(station) + relatedAssetsList(station);
   }
 }
@@ -983,9 +987,9 @@ function agencyCardExpanded(ctx, snap) {
         <ul class="asset-list">
           ${stations.map(s => `
             <li class="asset-item" style="cursor:pointer"
-                onclick="SelectionService.selectStation('${s.stationId}','list')">
+                onclick="SelectionService.selectStation('${s.stationId}','list',{label:'${s.label.replace(/'/g,"\\'")}',district:'${s.district.replace(/'/g,"\\'")}' })">
               <span class="ai-name">${s.label}</span>
-              <span class="ai-count" style="font-size:0.65rem">${s.stationId}</span>
+              <span class="ai-count" style="font-size:0.65rem">${s.district}</span>
             </li>`).join("")}
         </ul>` : ""}
       </div>
@@ -1012,14 +1016,11 @@ function stationCard(station) {
         <div class="card-icon icon-station">🚒</div>
         <div class="card-title-group">
           <div class="card-title">${station.label}</div>
-          <div class="card-subtitle">${station.address || station.stationId}</div>
+          <div class="card-subtitle">${station.district}</div>
         </div>
       </div>
       <div class="card-body">
-        <div class="tag-row">
-          <span class="tag">${station.stationId}</span>
-        </div>
-        <div class="data-grid" style="margin-top:0.75rem">
+        <div class="data-grid" style="margin-top:0.5rem">
           <div class="data-item"><div class="di-val">—</div><div class="di-label">Hydrants</div></div>
           <div class="data-item"><div class="di-val">—</div><div class="di-label">Buffer mi²</div></div>
           <div class="data-item"><div class="di-val">—</div><div class="di-label">Drive-Mi Zones</div></div>
