@@ -510,6 +510,8 @@ const StationService = (() => {
         returnGeometry: false,
       });
       const seen = new Set();
+      const rawIds = r.features.map(f => f.attributes["Station"]);
+      log(`StationService: raw Station IDs = ${JSON.stringify(rawIds)}`, "side");
       _stations = r.features
         .map(f => ({
           stationId: f.attributes["Station"],
