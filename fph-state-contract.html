@@ -837,14 +837,14 @@ mapEl.addEventListener("arcgisViewReadyChange", async () => {
     const extentResult = await stationsLayer.queryExtent({ where: ctx.defExpression });
     if (extentResult.extent) await view.goTo(extentResult.extent.expand(1.5));
 
-    // Set context atom → triggers ribbon + card stack render
-    $agencyContext.set(ctx);
-    log(`$agencyContext set for "${ctx.agencyName}"`, "state");
-
-    // Load station list + snapshot
+    // Load station list + snapshot first, then set context atom
+    // This ensures the single render triggered by $agencyContext.set has full data
     await StationService.loadAgencyStations(ctx.defExpression, ctx.autoAidExpr);
     await StationService.loadSnapshot();
-    renderCardStack();  // single render after all data is ready
+
+    // Set context atom → triggers ribbon + card stack render (with full station data)
+    $agencyContext.set(ctx);
+    log(`$agencyContext set for "${ctx.agencyName}"`, "state");
 
     log("App ready", "state");
 
