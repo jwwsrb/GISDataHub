@@ -297,10 +297,10 @@ const DRIVE_MILE_RENDERER = {
   type: "unique-value",
   field: "tobreak",
   uniqueValueInfos: [
-    { value: 1.5, label: "1.5 mi", symbol: { type: "simple-fill", color: [237, 81,  81,  160], outline: { color: [255,255,255], width: 0.5 } } },
-    { value: 2.5, label: "2.5 mi", symbol: { type: "simple-fill", color: [20,  158, 206, 160], outline: { color: [255,255,255], width: 0.5 } } },
-    { value: 5,   label: "5 mi",   symbol: { type: "simple-fill", color: [148, 103, 189, 160], outline: { color: [255,255,255], width: 0.5 } } },
-    { value: 7,   label: "7 mi",   symbol: { type: "simple-fill", color: [240, 150, 50,  160], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 1.5, label: "1.5 mi", symbol: { type: "simple-fill", color: [237, 81,  81  ], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 2.5, label: "2.5 mi", symbol: { type: "simple-fill", color: [20,  158, 206 ], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 5,   label: "5 mi",   symbol: { type: "simple-fill", color: [148, 103, 189 ], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 7,   label: "7 mi",   symbol: { type: "simple-fill", color: [240, 150, 50  ], outline: { color: [255,255,255], width: 0.5 } } },
   ],
 };
 
@@ -314,8 +314,8 @@ const STATION_RENDERER = {
 const makeStationLabelClass = (size = 13) => new LabelClass({
   labelExpressionInfo: { expression: `$feature["StationName"] + " (" + $feature["Station"] + ")"` },
   symbol: {
-    type: "text", color: [80, 80, 80], haloColor: [255, 255, 255], haloSize: 1,
-    font: { family: "Arial", style: "normal", weight: "normal", size },
+    type: "text", color: [60, 60, 60], haloColor: [255, 255, 255], haloSize: 1.5,
+    font: { family: "Roboto", style: "normal", weight: "bold", size },
     xoffset: -8, yoffset: 11,
   },
   labelPlacement: "center-right",
@@ -720,6 +720,7 @@ const driveMiLayer = new FeatureLayer({
   title:                "Drive Mile Coverage",
   definitionExpression: "1=2",
   outFields:            ["Station", "DIST1", "tobreak"],
+  opacity:              0.35,
   renderer:             DRIVE_MILE_RENDERER,
   popupEnabled:         false,
 });
