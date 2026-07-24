@@ -390,14 +390,14 @@ async function resolveAgency(portalUsername) {
 
   // Step 3: build definition expressions
   const inList           = fpdCodes.map(c => `'${c}'`).join(", ");
-  const defExpression    = `DIST1 IN (${inList})`;
+  const defExpression    = `DIST1 IN (${inList}) AND STNTYPE = 'A'`;
   const fpdDefExpression = `fire_prote = ${sqlQuote(fire_prote)}`;
 
   // Auto-aid: stations whose DIST2-24 contain agency FPD codes but DIST1 does not
   const distClause  = fpdCodes.length === 1 ? `= '${fpdCodes[0]}'` : `IN (${inList})`;
   const autoAidExpr = `(${
     Array.from({ length: 23 }, (_, i) => `DIST${i + 2} ${distClause}`).join(" OR ")
-  }) AND DIST1 NOT IN (${inList})`;
+  }) AND DIST1 NOT IN (${inList}) AND STNTYPE = 'A'`;
 
   log(`AgencyService: defExpression = "${defExpression}"`, "state");
 
@@ -608,7 +608,7 @@ function agencyCardExpanded(ctx, snap) {
             data-district="${s.district.replace(/"/g, '&quot;')}"
             data-address="${s.address.replace(/"/g, '&quot;')}"
             onclick="handleStationClick(this)">
-          <span class="ai-name">${s.label}</span>
+          <span class="ai-name">${s.label} <span style="font-size:0.65rem;color:var(--fph-text-muted)">(${s.stationId})</span></span>
           <span class="ai-count" style="font-size:0.65rem">${s.district}</span>
         </li>`).join("")}
     </ul>`;
