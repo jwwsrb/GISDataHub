@@ -596,6 +596,7 @@ function renderCardStack() {
 function agencyCardExpanded(ctx, snap) {
   const stations     = StationService.getStations();
   const autoAid      = StationService.getAutoAidStations();
+  log(`agencyCardExpanded: ${stations.length} stations, ${autoAid.length} auto-aid`, "side");
 
   const stationList = (list, section) => !list.length ? "" : `
     <div class="section-label" style="margin-top:0.9rem">${section}</div>
