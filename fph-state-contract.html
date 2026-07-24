@@ -595,13 +595,17 @@ const MapService = (() => {
       if (stationHit) {
         // Hit test graphics may not carry all attributes — query by OBJECTID
         const oid = stationHit.graphic.attributes["OBJECTID"];
+        log(`hit: station graphic attrs = ${JSON.stringify(stationHit.graphic.attributes)}`, "side");
+        log(`hit: querying by OBJECTID=${oid}`, "side");
         try {
           const result = await _stationsLayer.queryFeatures({
             objectIds: [oid],
-            outFields: ["STATION"],
+            outFields: ["*"],
             returnGeometry: false,
           });
-          const stationId = result.features[0]?.attributes["STATION"];
+          const attrs = result.features[0]?.attributes;
+          log(`hit: station attrs = ${JSON.stringify(attrs)}`, "side");
+          const stationId = attrs?.["STATION"];
           log(`hit: station layer → STATION="${stationId}"`, "action");
           SelectionService.selectStation(stationId, "map");
         } catch(e) {
