@@ -528,7 +528,7 @@ const MOCK_AGENCY = {
 // SOURCE ATOMS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** { stationId: string | null } — stable STATION key, never OBJECTID */
+/** { stationId: string | null } — stable Station key (mixed case), never OBJECTID */
 const $selection = atom({ stationId: null });
 
 /** Set once after OAuth resolves; read-only after */
@@ -606,7 +606,7 @@ const MapService = (() => {
           });
           const attrs = result.features[0]?.attributes;
           log(`hit: station attrs = ${JSON.stringify(attrs)}`, "side");
-          const stationId = attrs?.["STATION"];
+          const stationId = attrs?.["Station"];
           log(`hit: station layer → STATION="${stationId}"`, "action");
           SelectionService.selectStation(stationId, "map");
         } catch(e) {
@@ -620,7 +620,7 @@ const MapService = (() => {
         r => r.layer === _driveMiLayer
       );
       if (driveMiHit) {
-        const stationId = driveMiHit.graphic.attributes["STATION"];
+        const stationId = driveMiHit.graphic.attributes["Station"];
         log(`hit: drive-mile layer → proxying STATION="${stationId}"`, "action");
         SelectionService.selectStation(stationId, "map");
         return;
@@ -638,9 +638,9 @@ const MapService = (() => {
     if (!_view || !_stationsLayer) return;
     try {
       const result = await _stationsLayer.queryFeatures({
-        where: `STATION = '${stationId}'`,
+        where: `Station = '${stationId}'`,
         returnGeometry: true,
-        outFields: ["STATION"],
+        outFields: ["Station"],
       });
       if (result.features.length) {
         await _view.goTo({ target: result.features[0].geometry, zoom: 14 });
@@ -658,7 +658,7 @@ const MapService = (() => {
     try {
       const layerView = await _view.whenLayerView(_stationsLayer);
       const result = await _stationsLayer.queryFeatures({
-        where: `STATION = '${stationId}'`,
+        where: `Station = '${stationId}'`,
         returnGeometry: false,
         outFields: ["OBJECTID"],
       });
@@ -740,12 +740,12 @@ const StationService = (() => {
     try {
       const result = await _stationsLayer.queryFeatures({
         where: defExpression || "1=1",
-        outFields: ["STATION", "STATIONNAME", "DIST1"],
+        outFields: ["Station", "StationName", "DIST1"],
         returnGeometry: false,
       });
       _stations = result.features.map(f => ({
-        stationId: f.attributes["STATION"],
-        label:     f.attributes["STATIONNAME"] || f.attributes["STATION"],
+        stationId: f.attributes["Station"],
+        label:     f.attributes["StationName"] || f.attributes["Station"],
         address:   f.attributes["DIST1"] || "",
       }));
       log(`StationService: loaded ${_stations.length} stations`, "state");
@@ -1085,7 +1085,7 @@ require([
   const driveMiLayer = new FeatureLayer({
     url: DRIVE_MILE_URL,
     definitionExpression: MOCK_AGENCY.defExpression,
-    outFields: ["STATION", "DIST1"],
+    outFields: ["Station", "DIST1"],
     popupEnabled: false,
   });
 
