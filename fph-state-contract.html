@@ -676,8 +676,8 @@ const MapService = (() => {
       );
       if (driveMiHit) {
         log(`hit: drive-mile attrs = ${JSON.stringify(driveMiHit.graphic.attributes)}`, "side");
-        const stationId = driveMiHit.graphic.attributes["Station"];
-        log(`hit: drive-mile layer → proxying Station="${stationId}"`, "action");
+        const stationId = driveMiHit.graphic.attributes["STATION"];
+        log(`hit: drive-mile layer → proxying STATION="${stationId}"`, "action");
         SelectionService.selectStation(stationId, "map");
         return;
       }
@@ -1175,6 +1175,14 @@ require([
       stationsLayer.definitionExpression = ctx.defExpression;
       driveMiLayer.definitionExpression  = ctx.defExpression;
 
+      // Zoom to agency extent immediately — before any other async work
+      const extentResult = await stationsLayer.queryExtent({
+        where: ctx.defExpression,
+      });
+      if (extentResult.extent) {
+        await view.goTo(extentResult.extent.expand(1.5));
+      }
+
       // Set agency context atom — triggers ribbon + card stack render
       $agencyContext.set(ctx);
       log(`$agencyContext set for "${ctx.agencyName}"`, "state");
@@ -1183,15 +1191,6 @@ require([
       await StationService.loadAgencyStations(ctx.defExpression);
       await StationService.loadSnapshot(ctx.defExpression);
       renderCardStack();
-
-      // Zoom to agency extent — query actual features, not fullExtent
-      // (fullExtent reflects the whole service regardless of definitionExpression)
-      const extentResult = await stationsLayer.queryExtent({
-        where: ctx.defExpression,
-      });
-      if (extentResult.extent) {
-        await view.goTo(extentResult.extent.expand(1.5));
-      }
 
       log("App ready", "state");
 
