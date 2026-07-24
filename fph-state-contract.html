@@ -5,15 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FireProtectionHub v2</title>
 
-  <!-- ArcGIS Maps SDK for JavaScript (4.29 / Maps SDK 5.1) -->
-  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css" />
-  <script src="https://js.arcgis.com/4.29/"></script>
+  <!-- ArcGIS Maps SDK 5.1 — single tag loads core API, map components, and Calcite -->
+  <script type="module" src="https://js.arcgis.com/5.1/"></script>
 
-  <!-- Calcite Design System -->
-  <script type="module" src="https://js.arcgis.com/calcite-components/3.0.3/calcite.esm.js"></script>
-  <link rel="stylesheet" href="https://js.arcgis.com/calcite-components/3.0.3/calcite.css" />
-
-  <!-- nanostores — inlined to avoid CDN/module timing issues -->
+  <!-- nanostores — plain script (executes before module scripts, intentional) -->
   <script>
   (function(global) {
     function atom(initial) {
@@ -51,23 +46,20 @@
     :root {
       --fph-right-width: 340px;
       --fph-ribbon-h: 2.5rem;
-      --fph-bg: #f5f5f5;
-      --fph-surface: #ffffff;
+      --fph-surface:  #ffffff;
       --fph-surface2: #f0f0f0;
-      --fph-border: rgba(0,0,0,0.12);
-      --fph-accent: #c84b1f;
-      --fph-accent2: #1a73b8;
-      --fph-text: #1a1a1a;
+      --fph-border:   rgba(0,0,0,0.12);
+      --fph-accent:   #8b0000;
+      --fph-accent2:  #1a73b8;
+      --fph-text:     #1a1a1a;
       --fph-text-muted: #6b6b6b;
-      --fph-tag-bg: rgba(26,115,184,0.1);
-      --fph-tag-text: #1a73b8;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--fph-bg);
+      background: #f5f5f5;
       color: var(--fph-text);
       height: 100dvh;
       overflow: hidden;
@@ -86,48 +78,42 @@
       flex-shrink: 0;
       font-size: 0.78rem;
     }
-
-    .ribbon-crumb {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      color: var(--fph-text-muted);
-    }
+    .ribbon-crumb { display: flex; align-items: center; gap: 0.4rem; }
     .ribbon-crumb button {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--fph-text-muted);
-      font-size: 0.78rem;
-      padding: 0.2rem 0.35rem;
-      border-radius: 4px;
+      background: none; border: none; cursor: pointer;
+      color: var(--fph-text-muted); font-size: 0.78rem;
+      padding: 0.2rem 0.35rem; border-radius: 4px;
       transition: color 0.15s, background 0.15s;
     }
-    .ribbon-crumb button:hover { color: var(--fph-text); background: var(--fph-surface2); }
+    .ribbon-crumb button:hover  { color: var(--fph-text); background: var(--fph-surface2); }
     .ribbon-crumb button.active { color: var(--fph-text); font-weight: 600; }
     .ribbon-crumb button:disabled { cursor: default; }
-    .ribbon-sep { margin: 0 0.25rem; color: var(--fph-border); user-select: none; font-size: 0.9rem; }
+    .ribbon-sep { margin: 0 0.25rem; color: var(--fph-border); user-select: none; }
+    .mode-badge {
+      font-size: 0.62rem; padding: 0.1rem 0.45rem; border-radius: 10px;
+      font-weight: 600; margin-left: auto;
+      background: rgba(139,0,0,0.1); color: var(--fph-accent);
+    }
+    .mode-badge.home { background: rgba(16,185,129,0.1); color: #059669; }
 
     /* ── Shell body ──────────────────────────────────────────────── */
     #shell-body { display: flex; flex: 1; overflow: hidden; }
 
     /* ── Map Area ────────────────────────────────────────────────── */
     #map-area { flex: 1; position: relative; overflow: hidden; }
-    #map-area arcgis-map { width: 100%; height: 100%; }
+    arcgis-map { width: 100%; height: 100%; }
 
     /* ── Right Panel ─────────────────────────────────────────────── */
     #right-panel {
       width: var(--fph-right-width);
       background: var(--fph-surface);
       border-left: 1px solid var(--fph-border);
-      overflow-y: auto;
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
+      overflow-y: auto; flex-shrink: 0;
+      display: flex; flex-direction: column;
     }
 
     /* ── Cards ───────────────────────────────────────────────────── */
-    .card { border-bottom: 1px solid var(--fph-border); overflow: hidden; }
+    .card { border-bottom: 1px solid var(--fph-border); }
     .card-header {
       display: flex; align-items: center; padding: 0.75rem 1rem; gap: 0.6rem;
       cursor: pointer; user-select: none; transition: background 0.15s;
@@ -138,11 +124,11 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 1rem; flex-shrink: 0;
     }
-    .icon-agency  { background: rgba(200,75,31,0.12); color: var(--fph-accent); }
-    .icon-station { background: rgba(26,115,184,0.12); color: var(--fph-accent2); }
-    .icon-assets  { background: rgba(139,92,246,0.12); color: #7c3aed; }
+    .icon-agency  { background: rgba(139,0,0,0.1);   color: #8b0000; }
+    .icon-station { background: rgba(26,115,184,0.1); color: #1a73b8; }
+    .icon-assets  { background: rgba(100,80,180,0.1); color: #6450b4; }
     .card-title-group { flex: 1; min-width: 0; }
-    .card-title   { font-size: 0.82rem; font-weight: 600; color: var(--fph-text); }
+    .card-title    { font-size: 0.82rem; font-weight: 600; color: var(--fph-text); }
     .card-subtitle { font-size: 0.7rem; color: var(--fph-text-muted); margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .card-body { display: none; padding: 0 1rem 1rem; }
     .card.expanded .card-body { display: block; }
@@ -156,41 +142,24 @@
     .data-item .di-val   { font-size: 1.1rem; font-weight: 700; color: var(--fph-text); line-height: 1; }
     .data-item .di-label { font-size: 0.65rem; color: var(--fph-text-muted); margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }
 
+    .section-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fph-text-muted); margin: 0.75rem 0 0.35rem; }
+
     .asset-list { list-style: none; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem; }
-    .asset-item {
-      display: flex; align-items: center; justify-content: space-between;
-      background: var(--fph-surface2); border-radius: 6px; padding: 0.45rem 0.65rem; font-size: 0.75rem;
-    }
+    .asset-item { display: flex; align-items: center; justify-content: space-between; background: var(--fph-surface2); border-radius: 6px; padding: 0.45rem 0.65rem; font-size: 0.75rem; }
     .asset-item .ai-name  { color: var(--fph-text); }
-    .asset-item .ai-count { font-size: 0.7rem; font-weight: 600; color: var(--fph-text-muted); padding: 0.1rem 0.4rem; border-radius: 10px; }
-
-    .section-label {
-      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; color: var(--fph-text-muted); margin: 0.75rem 0 0.35rem;
-    }
-
-    .mode-badge {
-      font-size: 0.62rem; padding: 0.1rem 0.45rem; border-radius: 10px;
-      font-weight: 600; letter-spacing: 0.04em;
-      background: rgba(200,75,31,0.12); color: var(--fph-accent); margin-left: auto;
-    }
-    .mode-badge.home { background: rgba(16,185,129,0.1); color: #059669; }
-
-    .search-result { padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.78rem; color: var(--fph-text); transition: background 0.12s; }
-    .search-result:hover { background: var(--fph-surface2); }
-    .search-result .sr-id { font-size: 0.67rem; color: var(--fph-text-muted); }
+    .asset-item .ai-count { font-size: 0.7rem; font-weight: 600; color: var(--fph-text-muted); }
 
     /* ── Dev Log ─────────────────────────────────────────────────── */
     #log-panel {
       position: fixed; bottom: 0; right: var(--fph-right-width); width: 380px;
       background: #f8f8f8; border: 1px solid var(--fph-border); border-bottom: none;
-      border-radius: 8px 8px 0 0; font-family: "JetBrains Mono","Fira Code",monospace;
-      font-size: 0.68rem; z-index: 50; overflow: hidden;
+      border-radius: 8px 8px 0 0; font-family: "Fira Code", monospace;
+      font-size: 0.68rem; z-index: 9999; overflow: hidden;
     }
     #log-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0.35rem 0.75rem; background: var(--fph-surface2); cursor: pointer;
-      user-select: none; font-size: 0.7rem; color: var(--fph-text-muted);
+      padding: 0.35rem 0.75rem; background: var(--fph-surface2);
+      cursor: pointer; user-select: none; font-size: 0.7rem; color: var(--fph-text-muted);
     }
     #log-header .log-title { font-weight: 600; color: var(--fph-text); }
     #log-body { height: 140px; overflow-y: auto; padding: 0.5rem 0.75rem; display: flex; flex-direction: column-reverse; }
@@ -208,12 +177,10 @@
   <div id="ribbon"></div>
 
   <div id="shell-body">
-
-    <!-- Map Area — native JSAPI widgets slotted in -->
     <main id="map-area">
       <arcgis-map id="the-map" basemap="topo-vector" center="-120.5,47.5" zoom="7">
 
-        <!-- Top-left widget stack (matches standard Portal web map layout) -->
+        <!-- Standard Portal web map widget stack, top-left -->
         <arcgis-home             slot="top-left"></arcgis-home>
         <arcgis-expand slot="top-left" expand-icon="basemap"  expand-tooltip="Basemaps" auto-collapse>
           <arcgis-basemap-gallery></arcgis-basemap-gallery>
@@ -226,18 +193,16 @@
         </arcgis-expand>
         <arcgis-zoom             slot="top-left"></arcgis-zoom>
 
-        <!-- Search: top-right -->
+        <!-- Search top-right -->
         <arcgis-search slot="top-right"></arcgis-search>
 
-        <!-- Scale bar: bottom-left -->
+        <!-- Scale bar bottom-left -->
         <arcgis-scale-bar slot="bottom-left" unit="dual"></arcgis-scale-bar>
 
       </arcgis-map>
     </main>
 
-    <!-- Right Card Stack -->
     <aside id="right-panel"></aside>
-
   </div>
 
   <!-- Dev Log -->
@@ -249,7 +214,10 @@
     <div id="log-body"></div>
   </div>
 
-<script>
+<script type="module">
+// ─────────────────────────────────────────────────────────────────────────────
+// nanostores (set up by plain script before this module runs)
+// ─────────────────────────────────────────────────────────────────────────────
 const { atom, computed } = window.nanostores;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -264,10 +232,31 @@ const USERNAMES_ITEM_ID = "a634dbad39de45ffb555381018c64892";
 const sqlQuote = s => `'${s.replace(/'/g, "''")}'`;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// IMPORTS — $arcgis.import() replaces AMD require()
+// ─────────────────────────────────────────────────────────────────────────────
+const [
+  FeatureLayer,
+  GraphicsLayer,
+  Graphic,
+  LabelClass,
+  unionOperator,
+  esriId,
+  OAuthInfo,
+] = await $arcgis.import([
+  "@arcgis/core/layers/FeatureLayer.js",
+  "@arcgis/core/layers/GraphicsLayer.js",
+  "@arcgis/core/Graphic.js",
+  "@arcgis/core/layers/support/LabelClass.js",
+  "@arcgis/core/geometry/operators/unionOperator.js",
+  "@arcgis/core/identity/IdentityManager.js",
+  "@arcgis/core/identity/OAuthInfo.js",
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PROPER CASE HELPER
 // ─────────────────────────────────────────────────────────────────────────────
 const LOWERCASE_EX = new Set(["a","an","and","at","but","by","for","in","nor","of","on","or","so","the","to","up","yet"]);
-const UPPERCASE_EX = new Set(["ii","iii","iv","vi","vii","viii","ix","ne","nw","se","sw","us","sr","wa","llc","inc","ltd","lp","llp","f.p.d.","f.p.d","fpd","ems","rfa"]);
+const UPPERCASE_EX = new Set(["ii","iii","iv","vi","vii","viii","ne","nw","se","sw","us","sr","wa","llc","inc","ltd","lp","llp","fpd","ems","rfa","f.p.d.","f.p.d"]);
 
 function properCase(str) {
   if (!str) return str;
@@ -284,156 +273,65 @@ function properCase(str) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LAYER RENDERERS + LABEL CLASSES
-// (defined here so AgencyService can reference them; LabelClass injected after AMD loads)
+// RENDERERS + LABEL CLASSES
 // ─────────────────────────────────────────────────────────────────────────────
 
-// FPD boundaries — thin dark-red fill + outline; thicker outer boundary
-// achieved via a GraphicsLayer dissolve (Option B — no second hosted layer)
+// FPD — light dark-red fill, 1.5px outline (individual FPD boundaries)
 const FPD_RENDERER = {
   type:   "simple",
-  symbol: {
-    type:    "simple-fill",
-    color:   [139, 0, 0, 0.06],
-    outline: { color: [139, 0, 0], width: 1.5 },
-  },
+  symbol: { type: "simple-fill", color: [139, 0, 0, 15], outline: { color: [139, 0, 0], width: 1.5 } },
 };
 
-// Drive mile — unique-value by tobreak (radius in miles)
-const DRIVE_MILE_RENDERER = {
-  type:  "unique-value",
-  field: "tobreak",
-  uniqueValueInfos: [
-    { value: 1.5, label: "1.5 mi", symbol: { type: "simple-fill", color: [237, 81,  81,  180], outline: { color: [255,255,255], width: 0.5 } } },
-    { value: 2.5, label: "2.5 mi", symbol: { type: "simple-fill", color: [20,  158, 206, 180], outline: { color: [255,255,255], width: 0.5 } } },
-    { value: 5,   label: "5 mi",   symbol: { type: "simple-fill", color: [148, 103, 189, 180], outline: { color: [255,255,255], width: 0.5 } } },
-    { value: 7,   label: "7 mi",   symbol: { type: "simple-fill", color: [240, 150, 50,  180], outline: { color: [255,255,255], width: 0.5 } } },
-  ],
-};
-
-// Station — web-style fire-station symbol (Esri 2D symbol library)
-const STATION_RENDERER = {
-  type:   "simple",
-  symbol: {
-    type:      "web-style",
-    name:      "fire-station",
-    styleName: "Esri2DPointSymbolsStyle",
-  },
-};
-
-// Station label class factory — primary uses size 13, auto-aid uses size 11
-// LabelClass constructor injected as window._LabelClass after AMD loads
-const makeLabelClass = (size = 13) => new window._LabelClass({
-  labelExpressionInfo: {
-    expression: `$feature["StationName"] + " (" + $feature["Station"] + ")"`,
-  },
-  symbol: {
-    type:      "text",
-    color:     [80, 80, 80],
-    haloColor: [255, 255, 255],
-    haloSize:  1,
-    font:      { family: "Arial", style: "normal", weight: "normal", size },
-    xoffset:   -8,
-    yoffset:   11,
-  },
-  labelPlacement: "center-right",
-});
-
-// FPD label class
-const makeFPDLabelClass = (size = 12) => new window._LabelClass({
+// FPD labels — Roboto bold, dark red
+const makeFPDLabelClass = (size = 12) => new LabelClass({
   labelExpressionInfo: { expression: `$feature.fpd_desc` },
   symbol: {
-    type:      "text",
-    color:     [168, 0, 0, 199],
-    haloColor: [252, 250, 250],
-    haloSize:  2,
-    font:      { family: "Roboto", weight: "bold", size },
+    type: "text", color: [168, 0, 0, 199], haloColor: [252, 250, 250], haloSize: 2,
+    font: { family: "Roboto", weight: "bold", size },
   },
   labelPlacement: "always-horizontal",
 });
 
+// Drive mile — unique-value by tobreak
+const DRIVE_MILE_RENDERER = {
+  type: "unique-value",
+  field: "tobreak",
+  uniqueValueInfos: [
+    { value: 1.5, label: "1.5 mi", symbol: { type: "simple-fill", color: [237, 81,  81,  160], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 2.5, label: "2.5 mi", symbol: { type: "simple-fill", color: [20,  158, 206, 160], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 5,   label: "5 mi",   symbol: { type: "simple-fill", color: [148, 103, 189, 160], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 7,   label: "7 mi",   symbol: { type: "simple-fill", color: [240, 150, 50,  160], outline: { color: [255,255,255], width: 0.5 } } },
+  ],
+};
+
+// Stations — web-style fire-station symbol
+const STATION_RENDERER = {
+  type:   "simple",
+  symbol: { type: "web-style", name: "fire-station", styleName: "Esri2DPointSymbolsStyle" },
+};
+
+// Station labels — Arial, offset above symbol; smaller for auto-aid
+const makeStationLabelClass = (size = 13) => new LabelClass({
+  labelExpressionInfo: { expression: `$feature["StationName"] + " (" + $feature["Station"] + ")"` },
+  symbol: {
+    type: "text", color: [80, 80, 80], haloColor: [255, 255, 255], haloSize: 1,
+    font: { family: "Arial", style: "normal", weight: "normal", size },
+    xoffset: -8, yoffset: 11,
+  },
+  labelPlacement: "center-right",
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
-// AGENCY SERVICE — resolves portal username → agency context at login
-// Chain: portal_user → fire_prote → FPD_CODEs + geometry → defExpressions
+// OAUTH
 // ─────────────────────────────────────────────────────────────────────────────
-const AgencyService = (() => {
-
-  async function resolve(portalUsername) {
-    log(`AgencyService: resolving "${portalUsername}"`, "state");
-
-    // Step 1: username → fire_prote
-    const usernamesTable = new window._FeatureLayer({ portalItem: { id: USERNAMES_ITEM_ID } });
-    const userResult = await usernamesTable.queryFeatures({
-      where: `portal_user = '${portalUsername}'`,
-      outFields: ["portal_user", "fire_prote"],
-      returnGeometry: false,
-    });
-    if (!userResult.features.length) throw new Error(`No agency found for portal user "${portalUsername}"`);
-
-    const fire_prote = userResult.features[0].attributes["fire_prote"];
-    log(`AgencyService: fire_prote = "${fire_prote}"`, "state");
-
-    // Step 2: fire_prote → FPD_CODEs + unioned geometry (for agency boundary GraphicsLayer)
-    const fpdQueryLayer = new window._FeatureLayer({ url: FPD_URL });
-    const fpdResult = await fpdQueryLayer.queryFeatures({
-      where: `fire_prote = ${sqlQuote(fire_prote)}`,
-      outFields: ["FPD_CODE"],
-      returnGeometry: true,
-      outSpatialReference: { wkid: 102100 },
-    });
-    if (!fpdResult.features.length) throw new Error(`No FPD_CODEs found for agency "${fire_prote}"`);
-
-    const fpdCodes = fpdResult.features.map(f => f.attributes["FPD_CODE"]);
-    log(`AgencyService: FPD_CODEs = [${fpdCodes.join(", ")}]`, "state");
-
-    // Union FPD geometries → single agency boundary polygon
-    let agencyGeometry = null;
-    try {
-      const geometries = fpdResult.features.map(f => f.geometry);
-      agencyGeometry = geometries.length === 1
-        ? geometries[0]
-        : window._unionOperator.executeMany(geometries);
-      log(`AgencyService: agency boundary geometry computed`, "state");
-    } catch(e) {
-      log(`AgencyService: geometry union failed (${e.message}) — boundary layer skipped`, "side");
-    }
-
-    // Step 3: build definition expressions
-    const inList = fpdCodes.map(c => `'${c}'`).join(", ");
-    const defExpression    = `DIST1 IN (${inList})`;
-    const fpdDefExpression = `fire_prote = ${sqlQuote(fire_prote)}`;
-
-    // Auto-aid expression — stations whose DIST2-24 contain any of the agency's FPD codes
-    // but whose DIST1 is NOT one of them (i.e. not a primary station for this agency)
-    const distClause = fpdCodes.length === 1
-      ? `= '${fpdCodes[0]}'`
-      : `IN (${inList})`;
-    const autoAidExpr = `(${
-      Array.from({ length: 23 }, (_, i) => `DIST${i + 2} ${distClause}`).join(" OR ")
-    }) AND DIST1 NOT IN (${inList})`;
-
-    log(`AgencyService: defExpression = "${defExpression}"`, "state");
-
-    return {
-      agencyName:      properCase(fire_prote),
-      fire_prote,
-      portalUsername,
-      fpdCodes,
-      defExpression,
-      fpdDefExpression,
-      autoAidExpr,
-      agencyGeometry,
-    };
-  }
-
-  return { resolve };
-})();
+const oauthInfo = new OAuthInfo({ appId: AGOL_CLIENT_ID, portalUrl: AGOL_PORTAL, popup: false });
+esriId.registerOAuthInfos([oauthInfo]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SOURCE ATOMS
 // ─────────────────────────────────────────────────────────────────────────────
-const $selection     = atom({ stationId: null, label: "", district: "" });
-const $agencyContext = atom(null);
+const $selection      = atom({ stationId: null, label: "", district: "" });
+const $agencyContext  = atom(null);
 const $agencySnapshot = atom(null);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -449,37 +347,87 @@ const $breadcrumb = computed([$agencyContext, $selection], (ctx, sel) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AGENCY SERVICE
+// ─────────────────────────────────────────────────────────────────────────────
+async function resolveAgency(portalUsername) {
+  log(`AgencyService: resolving "${portalUsername}"`, "state");
+
+  // Step 1: username → fire_prote
+  const usernamesTable = new FeatureLayer({ portalItem: { id: USERNAMES_ITEM_ID } });
+  const userResult = await usernamesTable.queryFeatures({
+    where: `portal_user = '${portalUsername}'`,
+    outFields: ["portal_user", "fire_prote"], returnGeometry: false,
+  });
+  if (!userResult.features.length) throw new Error(`No agency found for portal user "${portalUsername}"`);
+
+  const fire_prote = userResult.features[0].attributes["fire_prote"];
+  log(`AgencyService: fire_prote = "${fire_prote}"`, "state");
+
+  // Step 2: fire_prote → FPD_CODEs + unioned geometry (for agency boundary)
+  const fpdQueryLayer = new FeatureLayer({ url: FPD_URL });
+  const fpdResult = await fpdQueryLayer.queryFeatures({
+    where: `fire_prote = ${sqlQuote(fire_prote)}`,
+    outFields: ["FPD_CODE"], returnGeometry: true,
+    outSpatialReference: { wkid: 102100 },
+  });
+  if (!fpdResult.features.length) throw new Error(`No FPD_CODEs found for agency "${fire_prote}"`);
+
+  const fpdCodes = fpdResult.features.map(f => f.attributes["FPD_CODE"]);
+  log(`AgencyService: FPD_CODEs = [${fpdCodes.join(", ")}]`, "state");
+
+  // Union FPD geometries → single agency boundary polygon
+  let agencyGeometry = null;
+  try {
+    const geometries = fpdResult.features.map(f => f.geometry);
+    agencyGeometry = geometries.length === 1
+      ? geometries[0]
+      : unionOperator.executeMany(geometries);
+    log(`AgencyService: agency boundary computed`, "state");
+  } catch(e) {
+    log(`AgencyService: geometry union failed — ${e.message}`, "side");
+  }
+
+  // Step 3: build definition expressions
+  const inList           = fpdCodes.map(c => `'${c}'`).join(", ");
+  const defExpression    = `DIST1 IN (${inList})`;
+  const fpdDefExpression = `fire_prote = ${sqlQuote(fire_prote)}`;
+
+  // Auto-aid: stations whose DIST2-24 contain agency FPD codes but DIST1 does not
+  const distClause  = fpdCodes.length === 1 ? `= '${fpdCodes[0]}'` : `IN (${inList})`;
+  const autoAidExpr = `(${
+    Array.from({ length: 23 }, (_, i) => `DIST${i + 2} ${distClause}`).join(" OR ")
+  }) AND DIST1 NOT IN (${inList})`;
+
+  log(`AgencyService: defExpression = "${defExpression}"`, "state");
+
+  return {
+    agencyName: properCase(fire_prote),
+    fire_prote, portalUsername, fpdCodes,
+    defExpression, fpdDefExpression, autoAidExpr, agencyGeometry,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAP SERVICE
 // ─────────────────────────────────────────────────────────────────────────────
 const MapService = (() => {
-  let _view          = null;
-  let _stationsLayer = null;
-  let _highlight     = null;
+  let _view = null, _stationsLayer = null, _highlight = null;
 
   function init(view, stationsLayer) {
-    _view          = view;
-    _stationsLayer = stationsLayer;
+    _view = view; _stationsLayer = stationsLayer;
 
     _view.on("click", async (event) => {
-      const hitResult = await _view.hitTest(event, {
-        include: [_stationsLayer],
-        tolerance: 6,
-      });
-
+      const hitResult = await _view.hitTest(event, { include: [_stationsLayer], tolerance: 6 });
       const stationHit = hitResult.results.find(r => r.layer === _stationsLayer);
-
       if (!stationHit) {
         if (!hitResult.results.length) SelectionService.clearSelection();
         return;
       }
-
       const oidField = _stationsLayer.objectIdField || "OBJECTID";
       const oid      = stationHit.graphic.attributes[oidField];
       try {
         const result = await _stationsLayer.queryFeatures({
-          objectIds:      [oid],
-          outFields:      ["Station", "StationName", "FIRE_DISTRICT"],
-          returnGeometry: false,
+          objectIds: [oid], outFields: ["Station", "StationName", "FIRE_DISTRICT"], returnGeometry: false,
         });
         const attrs     = result.features[0]?.attributes;
         const stationId = attrs?.["Station"];
@@ -488,9 +436,7 @@ const MapService = (() => {
           label:    attrs?.["StationName"] || stationId,
           district: attrs?.["FIRE_DISTRICT"] || "",
         });
-      } catch(e) {
-        log(`hit: query failed: ${e.message}`, "side");
-      }
+      } catch(e) { log(`hit: query failed: ${e.message}`, "side"); }
     });
 
     log("MapService ready", "state");
@@ -499,12 +445,8 @@ const MapService = (() => {
   async function goToStation(stationId) {
     if (!_view || !_stationsLayer) return;
     try {
-      const result = await _stationsLayer.queryFeatures({
-        where: `Station = '${stationId}'`, returnGeometry: true, outFields: ["Station"],
-      });
-      if (result.features.length) {
-        await _view.goTo({ target: result.features[0].geometry, zoom: 14 });
-      }
+      const r = await _stationsLayer.queryFeatures({ where: `Station = '${stationId}'`, returnGeometry: true, outFields: ["Station"] });
+      if (r.features.length) await _view.goTo({ target: r.features[0].geometry, zoom: 14 });
     } catch(e) { log(`goTo failed: ${e.message}`, "side"); }
   }
 
@@ -512,85 +454,58 @@ const MapService = (() => {
     if (!_view || !_stationsLayer) return;
     clearHighlight();
     try {
-      const layerView = await _view.whenLayerView(_stationsLayer);
-      const result = await _stationsLayer.queryFeatures({
-        where: `Station = '${stationId}'`, returnGeometry: false, outFields: ["OBJECTID"],
-      });
-      if (result.features.length) {
-        _highlight = layerView.highlight(result.features);
-      }
+      const lv = await _view.whenLayerView(_stationsLayer);
+      const r  = await _stationsLayer.queryFeatures({ where: `Station = '${stationId}'`, returnGeometry: false, outFields: ["OBJECTID"] });
+      if (r.features.length) _highlight = lv.highlight(r.features);
     } catch(e) { log(`highlight failed: ${e.message}`, "side"); }
   }
 
-  function clearHighlight() {
-    if (_highlight) { _highlight.remove(); _highlight = null; }
-  }
-
+  function clearHighlight() { if (_highlight) { _highlight.remove(); _highlight = null; } }
   return { init, goToStation, highlightStation, clearHighlight };
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SELECTION SERVICE
 // ─────────────────────────────────────────────────────────────────────────────
-const SelectionService = (() => {
-
-  function selectStation(stationId, source = "map", display = {}) {
+const SelectionService = {
+  selectStation(stationId, source = "map", display = {}) {
     log(`selectStation("${stationId}", source="${source}")`, "action");
     $selection.set({ stationId, label: display.label || stationId, district: display.district || "" });
     MapService.highlightStation(stationId);
     if (source === "search" || source === "list") MapService.goToStation(stationId);
-    log(`$selection → ${JSON.stringify($selection.get())}`, "state");
-  }
-
-  function clearSelection() {
+  },
+  clearSelection() {
     log("clearSelection()", "action");
     $selection.set({ stationId: null, label: "", district: "" });
     MapService.clearHighlight();
-  }
-
-  return { selectStation, clearSelection };
-})();
-
+  },
+};
 window.SelectionService = SelectionService;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STATION SERVICE
 // ─────────────────────────────────────────────────────────────────────────────
 const StationService = (() => {
-  let _stationsLayer = null;
-  let _stations      = [];
-
-  function init(stationsLayer) { _stationsLayer = stationsLayer; }
-
-  async function loadAgencyStations(defExpression) {
-    if (!_stationsLayer) return [];
+  let _layer = null, _stations = [];
+  function init(layer) { _layer = layer; }
+  async function loadAgencyStations(expr) {
     try {
-      const result = await _stationsLayer.queryFeatures({
-        where: defExpression || "1=1",
-        outFields: ["Station", "StationName", "FIRE_DISTRICT"],
-        returnGeometry: false,
-      });
-      _stations = result.features.map(f => ({
+      const r = await _layer.queryFeatures({ where: expr || "1=1", outFields: ["Station","StationName","FIRE_DISTRICT"], returnGeometry: false });
+      _stations = r.features.map(f => ({
         stationId: f.attributes["Station"],
         label:     f.attributes["StationName"] || f.attributes["Station"],
         district:  f.attributes["FIRE_DISTRICT"] || "",
       }));
-      log(`StationService: loaded ${_stations.length} stations`, "state");
-      return _stations;
-    } catch(e) { log(`StationService query failed: ${e.message}`, "side"); return []; }
+      log(`StationService: ${_stations.length} stations loaded`, "state");
+    } catch(e) { log(`StationService failed: ${e.message}`, "side"); }
   }
-
-  async function loadSnapshot(defExpression) {
-    if (!_stationsLayer) return null;
+  async function loadSnapshot(expr) {
     try {
-      const count = await _stationsLayer.queryFeatureCount({ where: defExpression || "1=1" });
-      const snap = { stationCount: count, hydrantCount: "—", bufferCoverage: "—", loadedAt: new Date().toISOString() };
-      $agencySnapshot.set(snap);
+      const count = await _layer.queryFeatureCount({ where: expr || "1=1" });
+      $agencySnapshot.set({ stationCount: count, hydrantCount: "—", bufferCoverage: "—", loadedAt: new Date().toISOString() });
       log(`StationService: snapshot set (${count} stations)`, "state");
-      return snap;
-    } catch(e) { log(`StationService snapshot failed: ${e.message}`, "side"); return null; }
+    } catch(e) { log(`StationService snapshot failed: ${e.message}`, "side"); }
   }
-
   function getStations() { return _stations; }
   return { init, loadAgencyStations, loadSnapshot, getStations };
 })();
@@ -603,19 +518,13 @@ function renderRibbon() {
   const crumbs = $breadcrumb.get();
   const mode   = $mode.get();
   const badge  = `<span class="mode-badge ${mode}">${mode === "home" ? "HOME" : "STATION"}</span>`;
-
-  if (!crumbs.length) {
-    ribbon.innerHTML = `<span style="color:var(--fph-text-muted);font-size:0.75rem">Authenticating…</span>${badge}`;
-    return;
-  }
-
+  if (!crumbs.length) { ribbon.innerHTML = `<span style="color:var(--fph-text-muted);font-size:0.75rem">Authenticating…</span>${badge}`; return; }
   const parts = crumbs.map((c, i) => {
     const sep    = i > 0 ? `<span class="ribbon-sep">›</span>` : "";
     const isLast = i === crumbs.length - 1;
     if (isLast || !c.action) return `${sep}<span class="ribbon-crumb"><button class="active" disabled>${c.label}</button></span>`;
     return `${sep}<span class="ribbon-crumb"><button onclick="SelectionService.clearSelection()">${c.label}</button></span>`;
   }).join("");
-
   ribbon.innerHTML = parts + badge;
 }
 
@@ -626,10 +535,7 @@ function renderCardStack() {
   const snap  = $agencySnapshot.get();
   const sel   = $selection.get();
 
-  if (!ctx) {
-    right.innerHTML = `<div style="padding:1rem;font-size:0.8rem;color:var(--fph-text-muted)">Authenticating…</div>`;
-    return;
-  }
+  if (!ctx) { right.innerHTML = `<div style="padding:1rem;font-size:0.8rem;color:var(--fph-text-muted)">Authenticating…</div>`; return; }
 
   if (mode === "home") {
     right.innerHTML = agencyCardExpanded(ctx, snap);
@@ -666,7 +572,7 @@ function agencyCardExpanded(ctx, snap) {
         <ul class="asset-list">
           ${stations.map(s => `
             <li class="asset-item" style="cursor:pointer"
-                onclick="SelectionService.selectStation('${s.stationId}','list',{label:${JSON.stringify(s.label)},district:${JSON.stringify(s.district)}})">
+                onclick="SelectionService.selectStation('${s.stationId}','list',${JSON.stringify({label: s.label, district: s.district})})">
               <span class="ai-name">${s.label}</span>
               <span class="ai-count">${s.district}</span>
             </li>`).join("")}
@@ -724,7 +630,7 @@ function relatedAssetsList(station) {
         <ul class="asset-list">
           <li class="asset-item"><span class="ai-name">Hydrant buffers</span><span class="ai-count">—</span></li>
           <li class="asset-item" style="opacity:0.55"><span class="ai-name">Drive-mile polygons</span><span class="ai-count">—</span></li>
-          <li class="asset-item" style="opacity:0.35"><span class="ai-name">Apparatus / CP feed</span><span class="ai-count" style="color:#7c3aed">v2 scope</span></li>
+          <li class="asset-item" style="opacity:0.35"><span class="ai-name">Apparatus / CP feed</span><span class="ai-count" style="color:#6450b4">v2 scope</span></li>
         </ul>
         <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.6rem">
           Hydrant buffers: display-only — no stable key (regenerated monthly)
@@ -737,18 +643,14 @@ function relatedAssetsList(station) {
 // DEV LOG
 // ─────────────────────────────────────────────────────────────────────────────
 function log(msg, type = "") {
-  const el  = document.getElementById("log-body");
-  const ts  = new Date().toLocaleTimeString("en-US", { hour12: false });
-  const div = document.createElement("div");
-  div.className   = `log-entry ${type}`;
-  div.textContent = `${ts}  ${msg}`;
-  el.prepend(div);
+  const el = document.getElementById("log-body");
+  const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
+  const d  = document.createElement("div");
+  d.className = `log-entry ${type}`; d.textContent = `${ts}  ${msg}`;
+  el.prepend(d);
 }
-window.toggleLog = function() {
-  const b = document.getElementById("log-body");
-  b.style.display = b.style.display === "none" ? "" : "none";
-};
-window.clearLog = function() { document.getElementById("log-body").innerHTML = ""; };
+window.toggleLog = () => { const b = document.getElementById("log-body"); b.style.display = b.style.display === "none" ? "" : "none"; };
+window.clearLog  = () => { document.getElementById("log-body").innerHTML = ""; };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SUBSCRIPTIONS
@@ -764,145 +666,112 @@ $agencySnapshot.subscribe(renderCardStack);
 renderRibbon();
 renderCardStack();
 
-require([
-  "esri/identity/OAuthInfo",
-  "esri/identity/IdentityManager",
-  "esri/layers/FeatureLayer",
-  "esri/layers/GraphicsLayer",
-  "esri/Graphic",
-  "esri/Map",
-  "esri/views/MapView",
-  "esri/layers/support/LabelClass",
-  "esri/geometry/operators/unionOperator",
-], function(OAuthInfo, esriId, FeatureLayer, GraphicsLayer, Graphic, Map, MapView, LabelClass, unionOperator) {
+// ── Layers (1=2 until login resolves — prevents statewide flash) ──────────
+const agencyBoundaryLayer = new GraphicsLayer({
+  title:    "Agency Boundary",
+  listMode: "hide",
+});
 
-  // Expose to modules defined before AMD loads
-  window._FeatureLayer  = FeatureLayer;
-  window._LabelClass    = LabelClass;
-  window._unionOperator = unionOperator;
+const fpdLayer = new FeatureLayer({
+  url:                  FPD_URL,
+  title:                "FPD Boundaries",
+  definitionExpression: "1=2",
+  outFields:            ["FPD_CODE", "fire_prote", "fpd_desc"],
+  labelsVisible:        true,
+  labelingInfo:         [makeFPDLabelClass(12)],
+  renderer:             FPD_RENDERER,
+  popupEnabled:         false,
+});
 
-  // ── OAuth ──────────────────────────────────────────────────────────
-  const oauthInfo = new OAuthInfo({ appId: AGOL_CLIENT_ID, portalUrl: AGOL_PORTAL, popup: false });
-  esriId.registerOAuthInfos([oauthInfo]);
+const stationsLayer = new FeatureLayer({
+  url:                  STATIONS_URL,
+  title:                "Fire Stations",
+  definitionExpression: "1=2",
+  outFields:            ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
+  labelsVisible:        true,
+  labelingInfo:         [makeStationLabelClass(13)],
+  renderer:             STATION_RENDERER,
+  popupEnabled:         false,
+});
 
-  // ── Agency boundary GraphicsLayer (Option B — thick outer outline, no second hosted layer)
-  const agencyBoundaryLayer = new GraphicsLayer({
-    title: "Agency Boundary",
-    listMode: "hide",   // keep out of layer list — it's a visual aid, not a data layer
-  });
+const autoAidLayer = new FeatureLayer({
+  url:                  STATIONS_URL,
+  title:                "Auto Aid Stations",
+  definitionExpression: "1=2",
+  outFields:            ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
+  labelsVisible:        true,
+  labelingInfo:         [makeStationLabelClass(11)],
+  opacity:              0.5,
+  renderer:             STATION_RENDERER,
+  popupEnabled:         false,
+});
 
-  // ── FPD layer — thin inner boundaries + labels ─────────────────────
-  const fpdLayer = new FeatureLayer({
-    url:                  FPD_URL,
-    title:                "FPD Boundaries",
-    definitionExpression: "1=2",
-    outFields:            ["FPD_CODE", "fire_prote", "fpd_desc"],
-    labelsVisible:        true,
-    renderer:             FPD_RENDERER,
-    popupEnabled:         false,
-  });
+const driveMiLayer = new FeatureLayer({
+  url:                  DRIVE_MILE_URL,
+  title:                "Drive Mile Coverage",
+  definitionExpression: "1=2",
+  outFields:            ["Station", "DIST1", "tobreak"],
+  renderer:             DRIVE_MILE_RENDERER,
+  popupEnabled:         false,
+});
 
-  // ── Primary stations ───────────────────────────────────────────────
-  const stationsLayer = new FeatureLayer({
-    url:                  STATIONS_URL,
-    title:                "Fire Stations",
-    definitionExpression: "1=2",
-    outFields:            ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
-    labelsVisible:        true,
-    renderer:             STATION_RENDERER,
-    popupEnabled:         false,
-  });
+// ── Wire map via arcgis-map web component event ───────────────────────────
+const mapEl = document.getElementById("the-map");
 
-  // ── Auto-aid stations — same URL, different expression, 50% opacity ─
-  const autoAidLayer = new FeatureLayer({
-    url:                  STATIONS_URL,
-    title:                "Auto Aid Stations",
-    definitionExpression: "1=2",
-    outFields:            ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
-    labelsVisible:        true,
-    opacity:              0.5,
-    renderer:             STATION_RENDERER,
-    popupEnabled:         false,
-  });
+mapEl.addEventListener("arcgisViewReadyChange", async () => {
+  const view = mapEl.view;
 
-  // ── Drive miles — unique-value renderer by tobreak ─────────────────
-  const driveMiLayer = new FeatureLayer({
-    url:                  DRIVE_MILE_URL,
-    title:                "Drive Mile Coverage",
-    definitionExpression: "1=2",
-    outFields:            ["Station", "DIST1", "tobreak"],
-    renderer:             DRIVE_MILE_RENDERER,
-    popupEnabled:         false,
-  });
+  // Layer draw order (bottom → top): drive miles, FPD, agency boundary, auto-aid, stations
+  view.map.addMany([driveMiLayer, fpdLayer, agencyBoundaryLayer, autoAidLayer, stationsLayer]);
 
-  // ── Map + View ─────────────────────────────────────────────────────
-  // Layer order: agency boundary (top visual), then stations, auto-aid,
-  // FPD boundaries, drive miles (bottom). arcgis-map web component
-  // already set basemap + center in HTML.
-  const mapEl = document.getElementById("the-map");
+  MapService.init(view, stationsLayer);
+  StationService.init(stationsLayer);
 
-  mapEl.addEventListener("arcgisViewReadyChange", async () => {
-    const view = mapEl.view;
-    view.map.addMany([driveMiLayer, fpdLayer, agencyBoundaryLayer, autoAidLayer, stationsLayer]);
+  log("View ready", "state");
 
-    // Apply label classes now that LabelClass is loaded
-    fpdLayer.labelingInfo      = [makeFPDLabelClass(12)];
-    stationsLayer.labelingInfo = [makeLabelClass(13)];
-    autoAidLayer.labelingInfo  = [makeLabelClass(11)];
+  try {
+    const cred = await esriId.checkSignInStatus(AGOL_PORTAL + "sharing")
+      .catch(() => esriId.getCredential(AGOL_PORTAL + "sharing"));
 
-    MapService.init(view, stationsLayer);
-    StationService.init(stationsLayer);
+    const portalUsername = cred.userId;
+    log(`OAuth: signed in as "${portalUsername}"`, "state");
 
-    log("View ready", "state");
+    const ctx = await resolveAgency(portalUsername);
 
-    try {
-      const cred = await esriId.checkSignInStatus(AGOL_PORTAL + "sharing")
-        .catch(() => esriId.getCredential(AGOL_PORTAL + "sharing"));
+    // Apply definition expressions
+    fpdLayer.definitionExpression      = ctx.fpdDefExpression;
+    stationsLayer.definitionExpression = ctx.defExpression;
+    autoAidLayer.definitionExpression  = ctx.autoAidExpr;
+    driveMiLayer.definitionExpression  = ctx.defExpression;
 
-      const portalUsername = cred.userId;
-      log(`OAuth: signed in as "${portalUsername}"`, "state");
-
-      const ctx = await AgencyService.resolve(portalUsername);
-
-      // Apply definition expressions
-      fpdLayer.definitionExpression      = ctx.fpdDefExpression;
-      stationsLayer.definitionExpression = ctx.defExpression;
-      autoAidLayer.definitionExpression  = ctx.autoAidExpr;
-      driveMiLayer.definitionExpression  = ctx.defExpression;
-
-      // Build agency boundary graphic (thick dark-red outline, no fill)
-      if (ctx.agencyGeometry) {
-        agencyBoundaryLayer.add(new Graphic({
-          geometry: ctx.agencyGeometry,
-          symbol: {
-            type:    "simple-fill",
-            color:   [0, 0, 0, 0],
-            outline: { color: [139, 0, 0], width: 3 },
-          },
-        }));
-      }
-
-      // Zoom to agency extent
-      const extentResult = await stationsLayer.queryExtent({ where: ctx.defExpression });
-      if (extentResult.extent) await view.goTo(extentResult.extent.expand(1.5));
-
-      // Set context atom → triggers ribbon + card stack render
-      $agencyContext.set(ctx);
-      log(`$agencyContext set for "${ctx.agencyName}"`, "state");
-
-      // Load station list + snapshot
-      await StationService.loadAgencyStations(ctx.defExpression);
-      await StationService.loadSnapshot(ctx.defExpression);
-      renderCardStack();
-
-      log("App ready", "state");
-
-    } catch(e) {
-      log(`Login failed: ${e.message}`, "side");
-      document.getElementById("right-panel").innerHTML =
-        `<div style="padding:1rem;font-size:0.8rem;color:var(--fph-text-muted)">Login failed: ${e.message}</div>`;
+    // Draw agency boundary (thick dark-red outline, no fill — Option B)
+    if (ctx.agencyGeometry) {
+      agencyBoundaryLayer.add(new Graphic({
+        geometry: ctx.agencyGeometry,
+        symbol: { type: "simple-fill", color: [0, 0, 0, 0], outline: { color: [139, 0, 0], width: 3 } },
+      }));
     }
-  });
+
+    // Zoom to agency extent
+    const extentResult = await stationsLayer.queryExtent({ where: ctx.defExpression });
+    if (extentResult.extent) await view.goTo(extentResult.extent.expand(1.5));
+
+    // Set context atom → triggers ribbon + card stack render
+    $agencyContext.set(ctx);
+    log(`$agencyContext set for "${ctx.agencyName}"`, "state");
+
+    // Load station list + snapshot
+    await StationService.loadAgencyStations(ctx.defExpression);
+    await StationService.loadSnapshot(ctx.defExpression);
+    renderCardStack();
+
+    log("App ready", "state");
+
+  } catch(e) {
+    log(`Login failed: ${e.message}`, "side");
+    document.getElementById("right-panel").innerHTML =
+      `<div style="padding:1rem;font-size:0.8rem;color:var(--fph-text-muted)">Login failed: ${e.message}</div>`;
+  }
 });
 </script>
 </body>
