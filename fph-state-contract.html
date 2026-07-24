@@ -725,14 +725,14 @@ const StationService = (() => {
     try {
       const result = await _stationsLayer.queryFeatures({
         where: defExpression || "1=1",
-        outFields: ["STATION", "STATION_NAME", "ADDRESS", "FIRE_PROTE"],
+        outFields: ["STATION", "STATIONNAME", "DIST1", "FIRE_PROTE"],
         returnGeometry: false,
         orderByFields: ["STATION"],
       });
       _stations = result.features.map(f => ({
         stationId: f.attributes["STATION"],
-        label:     f.attributes["STATION_NAME"] || f.attributes["STATION"],
-        address:   f.attributes["ADDRESS"] || "",
+        label:     f.attributes["STATIONNAME"] || f.attributes["STATION"],
+        address:   f.attributes["DIST1"] || "",
       }));
       log(`StationService: loaded ${_stations.length} stations`, "state");
       return _stations;
@@ -1064,13 +1064,15 @@ require([
   const stationsLayer = new FeatureLayer({
     url: STATIONS_URL,
     definitionExpression: MOCK_AGENCY.defExpression,
-    outFields: ["*"],
+    outFields: ["STATION", "STATIONNAME", "DIST1"],
+    popupEnabled: false,
   });
 
   const driveMiLayer = new FeatureLayer({
     url: DRIVE_MILE_URL,
     definitionExpression: MOCK_AGENCY.defExpression,
-    outFields: ["STATION"],
+    outFields: ["STATION", "DIST1"],
+    popupEnabled: false,
   });
 
   // ── Map + View ────────────────────────────────────────────────────
