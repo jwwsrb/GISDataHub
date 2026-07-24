@@ -276,14 +276,14 @@ function properCase(str) {
 // RENDERERS + LABEL CLASSES
 // ─────────────────────────────────────────────────────────────────────────────
 
-// FPD — light dark-red fill, 1.5px outline (individual FPD boundaries)
+// FPD — very light dark-red fill, 1.5px outline (individual FPD boundaries)
 const FPD_RENDERER = {
   type:   "simple",
-  symbol: { type: "simple-fill", color: [139, 0, 0, 15], outline: { color: [139, 0, 0], width: 1.5 } },
+  symbol: { type: "simple-fill", color: [139, 0, 0, 6], outline: { color: [139, 0, 0], width: 1.5 } },
 };
 
 // FPD labels — Roboto bold, dark red
-const makeFPDLabelClass = (size = 12) => new LabelClass({
+const makeFPDLabelClass = (size = 10) => new LabelClass({
   labelExpressionInfo: { expression: `$feature.fpd_desc` },
   symbol: {
     type: "text", color: [168, 0, 0, 199], haloColor: [252, 250, 250], haloSize: 2,
@@ -481,6 +481,12 @@ const SelectionService = {
   },
 };
 window.SelectionService = SelectionService;
+window.handleStationClick = (el) => {
+  SelectionService.selectStation(
+    el.dataset.id, "list",
+    { label: el.dataset.label, district: el.dataset.district }
+  );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STATION SERVICE
@@ -569,10 +575,13 @@ function agencyCardExpanded(ctx, snap) {
         </p>` : `<p style="font-size:0.75rem;color:var(--fph-text-muted);margin-top:0.5rem">Loading data…</p>`}
         ${stations.length ? `
         <div class="section-label" style="margin-top:0.9rem">Stations</div>
-        <ul class="asset-list">
+        <ul class="asset-list" id="station-list">
           ${stations.map(s => `
             <li class="asset-item" style="cursor:pointer"
-                onclick="SelectionService.selectStation('${s.stationId}','list',${JSON.stringify({label: s.label, district: s.district})})">
+                data-id="${s.stationId}"
+                data-label="${s.label.replace(/"/g, '&quot;')}"
+                data-district="${s.district.replace(/"/g, '&quot;')}"
+                onclick="handleStationClick(this)">
               <span class="ai-name">${s.label}</span>
               <span class="ai-count">${s.district}</span>
             </li>`).join("")}
@@ -669,7 +678,7 @@ renderCardStack();
 // ── Layers (1=2 until login resolves — prevents statewide flash) ──────────
 const agencyBoundaryLayer = new GraphicsLayer({
   title:    "Agency Boundary",
-  listMode: "hide",
+  listMode: "show",
 });
 
 const fpdLayer = new FeatureLayer({
@@ -748,7 +757,7 @@ mapEl.addEventListener("arcgisViewReadyChange", async () => {
     if (ctx.agencyGeometry) {
       agencyBoundaryLayer.add(new Graphic({
         geometry: ctx.agencyGeometry,
-        symbol: { type: "simple-fill", color: [0, 0, 0, 0], outline: { color: [139, 0, 0], width: 3 } },
+        symbol: { type: "simple-fill", color: [0, 0, 0, 0], outline: { color: [139, 0, 0, 200], width: 2.5 } },
       }));
     }
 
