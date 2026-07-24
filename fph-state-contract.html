@@ -583,7 +583,6 @@ const MapService = (() => {
       });
 
       if (!hitResult.results.length) {
-        // Empty click — clear selection
         SelectionService.clearSelection();
         return;
       }
@@ -594,13 +593,24 @@ const MapService = (() => {
         r => r.layer === _stationsLayer
       );
       if (stationHit) {
-        const stationId = stationHit.graphic.attributes["STATION"];
-        log(`hit: station layer → STATION="${stationId}"`, "action");
-        SelectionService.selectStation(stationId, "map");
+        // Hit test graphics may not carry all attributes — query by OBJECTID
+        const oid = stationHit.graphic.attributes["OBJECTID"];
+        try {
+          const result = await _stationsLayer.queryFeatures({
+            objectIds: [oid],
+            outFields: ["STATION"],
+            returnGeometry: false,
+          });
+          const stationId = result.features[0]?.attributes["STATION"];
+          log(`hit: station layer → STATION="${stationId}"`, "action");
+          SelectionService.selectStation(stationId, "map");
+        } catch(e) {
+          log(`hit: station attribute query failed: ${e.message}`, "side");
+        }
         return;
       }
 
-      // 2. Drive-mile polygon — resolve via STATION key (proxy)
+      // 2. Drive-mile polygon — STATION key is carried on the graphic
       const driveMiHit = hitResult.results.find(
         r => r.layer === _driveMiLayer
       );
@@ -611,7 +621,7 @@ const MapService = (() => {
         return;
       }
 
-      // 3. Anything else (hydrant buffer, etc.) — fall through, do nothing
+      // 3. Anything else — fall through
       log("hit: non-selectable layer — ignoring", "side");
     });
 
