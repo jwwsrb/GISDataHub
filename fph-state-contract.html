@@ -288,7 +288,7 @@ const makeFPDLabelClass = (size = 10) => new LabelClass({
   labelExpressionInfo: { expression: `$feature.fpd_desc` },
   symbol: {
     type: "text", color: [168, 0, 0, 199], haloColor: [252, 250, 250], haloSize: 2,
-    font: { family: "Arial", weight: "bold", size },
+    font: { family: "Avenir Next LT Pro", weight: "bold", size },
   },
   labelPlacement: "always-horizontal",
 });
@@ -316,7 +316,7 @@ const makeStationLabelClass = (size = 11) => new LabelClass({
   labelExpressionInfo: { expression: `$feature["StationName"]` },
   symbol: {
     type: "text", color: [60, 60, 60], haloColor: [255, 255, 255], haloSize: 1.5,
-    font: { family: "Arial", style: "normal", weight: "bold", size },
+    font: { family: "Avenir Next LT Pro", style: "normal", weight: "bold", size },
     xoffset: -8, yoffset: 11,
   },
   labelPlacement: "center-right",
@@ -509,13 +509,16 @@ const StationService = (() => {
         outFields: ["Station","StationName","FIRE_DISTRICT","StationAddress"],
         returnGeometry: false,
       });
-      _stations = r.features.map(f => ({
-        stationId: f.attributes["Station"],
-        label:     f.attributes["StationName"] || f.attributes["Station"],
-        district:  f.attributes["FIRE_DISTRICT"] || "",
-        address:   f.attributes["StationAddress"] || "",
-      }));
-      log(`StationService: ${_stations.length} primary stations loaded`, "state");
+      const seen = new Set();
+      _stations = r.features
+        .map(f => ({
+          stationId: f.attributes["Station"],
+          label:     f.attributes["StationName"] || f.attributes["Station"],
+          district:  f.attributes["FIRE_DISTRICT"] || "",
+          address:   f.attributes["StationAddress"] || "",
+        }))
+        .filter(s => { if (seen.has(s.stationId)) return false; seen.add(s.stationId); return true; });
+      log(`StationService: ${_stations.length} primary stations loaded (deduped)`, "state");
     } catch(e) { log(`StationService primary failed: ${e.message}`, "side"); }
 
     try {
@@ -524,29 +527,26 @@ const StationService = (() => {
         outFields: ["Station","StationName","FIRE_DISTRICT","StationAddress"],
         returnGeometry: false,
       });
-      _autoAidStations = r.features.map(f => ({
-        stationId: f.attributes["Station"],
-        label:     f.attributes["StationName"] || f.attributes["Station"],
-        district:  f.attributes["FIRE_DISTRICT"] || "",
-        address:   f.attributes["StationAddress"] || "",
-      }));
-      log(`StationService: ${_autoAidStations.length} auto-aid stations loaded`, "state");
+      const seen2 = new Set();
+      _autoAidStations = r.features
+        .map(f => ({
+          stationId: f.attributes["Station"],
+          label:     f.attributes["StationName"] || f.attributes["Station"],
+          district:  f.attributes["FIRE_DISTRICT"] || "",
+          address:   f.attributes["StationAddress"] || "",
+        }))
+        .filter(s => { if (seen2.has(s.stationId)) return false; seen2.add(s.stationId); return true; });
+      log(`StationService: ${_autoAidStations.length} auto-aid stations loaded (deduped)`, "state");
     } catch(e) { log(`StationService auto-aid failed: ${e.message}`, "side"); }
   }
 
-  async function loadSnapshot(expr, autoAidExpr) {
-    try {
-      const [primaryCount, autoAidCount] = await Promise.all([
-        _layer.queryFeatureCount({ where: expr || "1=1" }),
-        _autoAidLayer.queryFeatureCount({ where: autoAidExpr || "1=1" }),
-      ]);
-      $agencySnapshot.set({
-        stationCount:    primaryCount,
-        autoAidCount,
-        loadedAt: new Date().toISOString(),
-      });
-      log(`StationService: snapshot set (${primaryCount} primary, ${autoAidCount} auto-aid)`, "state");
-    } catch(e) { log(`StationService snapshot failed: ${e.message}`, "side"); }
+  async function loadSnapshot() {
+    $agencySnapshot.set({
+      stationCount:  _stations.length,
+      autoAidCount:  _autoAidStations.length,
+      loadedAt: new Date().toISOString(),
+    });
+    log(`StationService: snapshot set (${_stations.length} primary, ${_autoAidStations.length} auto-aid, deduped)`, "state");
   }
 
   function getStations()        { return _stations; }
@@ -842,7 +842,7 @@ mapEl.addEventListener("arcgisViewReadyChange", async () => {
 
     // Load station list + snapshot
     await StationService.loadAgencyStations(ctx.defExpression, ctx.autoAidExpr);
-    await StationService.loadSnapshot(ctx.defExpression, ctx.autoAidExpr);
+    await StationService.loadSnapshot();
     renderCardStack();
 
     log("App ready", "state");
