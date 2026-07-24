@@ -508,21 +508,76 @@ const { atom, computed } = window.nanostores;
 // ─────────────────────────────────────────────────────────────────────────────
 // LAYER URLs
 // ─────────────────────────────────────────────────────────────────────────────
-const AGOL_CLIENT_ID = "tS3sgaCh7cedVjCu";
-const AGOL_PORTAL   = "https://wsrb.maps.arcgis.com/";
-const STATIONS_URL   = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Fire_Stations/FeatureServer/0";
-const DRIVE_MILE_URL = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Drive_Mile_Disks/FeatureServer/1";
+const AGOL_CLIENT_ID       = "tS3sgaCh7cedVjCu";
+const AGOL_PORTAL          = "https://wsrb.maps.arcgis.com/";
+const STATIONS_URL         = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Fire_Stations/FeatureServer/0";
+const DRIVE_MILE_URL       = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Drive_Mile_Disks/FeatureServer/1";
+const FPD_URL              = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/FPD_Boundaries/FeatureServer/0";
+const USERNAMES_ITEM_ID    = "a634dbad39de45ffb555381018c64892";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MOCK AGENCY DATA — replace with real OAuth lookup when wiring login
+// AGENCY SERVICE — resolves portal username → agency context at login
+// Chain: portal_user → fire_prote → FPD_CODEs → definitionExpression
 // ─────────────────────────────────────────────────────────────────────────────
-const MOCK_AGENCY = {
-  agencyName:     "King County Fire District 45",
-  fdid:           "WA-4-03045",
-  agencyCode:     "KCF45",
-  portalUsername: "chief.johnson@kcfd45.wa.gov",
-  defExpression:  "DIST1 = '2645'",
-};
+const AgencyService = (() => {
+
+  /**
+   * resolve(portalUsername) → $agencyContext payload
+   * Step 1: query FireAgencyUsernames → fire_prote
+   * Step 2: query FPD_WA_only        → list of FPD_CODEs
+   * Step 3: build DIST1 IN (...)     → definitionExpression
+   */
+  async function resolve(portalUsername) {
+    log(`AgencyService: resolving "${portalUsername}"`, "state");
+
+    // ── Step 1: username → fire_prote ────────────────────────────────
+    const usernamesTable = new window._FeatureLayer({
+      portalItem: { id: USERNAMES_ITEM_ID },
+    });
+    const userResult = await usernamesTable.queryFeatures({
+      where: `portal_user = '${portalUsername}'`,
+      outFields: ["portal_user", "fire_prote"],
+      returnGeometry: false,
+    });
+
+    if (!userResult.features.length) {
+      throw new Error(`No agency found for portal user "${portalUsername}"`);
+    }
+
+    const fire_prote = userResult.features[0].attributes["fire_prote"];
+    log(`AgencyService: fire_prote = "${fire_prote}"`, "state");
+
+    // ── Step 2: fire_prote → FPD_CODEs ──────────────────────────────
+    const fpdLayer = new window._FeatureLayer({ url: FPD_URL });
+    const fpdResult = await fpdLayer.queryFeatures({
+      where: `fire_prote = '${fire_prote.replace(/'/g, "''")}'`,
+      outFields: ["FPD_CODE"],
+      returnGeometry: false,
+    });
+
+    if (!fpdResult.features.length) {
+      throw new Error(`No FPD_CODEs found for agency "${fire_prote}"`);
+    }
+
+    const fpdCodes = fpdResult.features.map(f => f.attributes["FPD_CODE"]);
+    log(`AgencyService: FPD_CODEs = [${fpdCodes.join(", ")}]`, "state");
+
+    // ── Step 3: build definitionExpression ──────────────────────────
+    const inList = fpdCodes.map(c => `'${c}'`).join(", ");
+    const defExpression = `DIST1 IN (${inList})`;
+    log(`AgencyService: defExpression = "${defExpression}"`, "state");
+
+    return {
+      agencyName:     fire_prote,
+      fire_prote,
+      portalUsername,
+      fpdCodes,
+      defExpression,
+    };
+  }
+
+  return { resolve };
+})();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SOURCE ATOMS
@@ -1058,33 +1113,28 @@ require([
   "esri/layers/FeatureLayer",
   "esri/Map",
   "esri/views/MapView",
-  "esri/widgets/Zoom",
-], function(OAuthInfo, esriId, FeatureLayer, Map, MapView, Zoom) {
+], function(OAuthInfo, esriId, FeatureLayer, Map, MapView) {
+
+  // expose FeatureLayer to AgencyService (defined before require)
+  window._FeatureLayer = FeatureLayer;
 
   // ── OAuth ─────────────────────────────────────────────────────────
   const oauthInfo = new OAuthInfo({
     appId: AGOL_CLIENT_ID,
     portalUrl: AGOL_PORTAL,
-    popup: false,   // redirect flow
+    popup: false,
   });
   esriId.registerOAuthInfos([oauthInfo]);
 
-  // Check for existing session, prompt login if none
-  esriId.checkSignInStatus(AGOL_PORTAL + "sharing").catch(() => {
-    esriId.getCredential(AGOL_PORTAL + "sharing");
-  });
-
-  // ── Layers ────────────────────────────────────────────────────────
+  // ── Layers (no defExpression yet — set after login resolves) ──────
   const stationsLayer = new FeatureLayer({
     url: STATIONS_URL,
-    definitionExpression: MOCK_AGENCY.defExpression,
     outFields: ["Station", "StationName", "DIST1"],
     popupEnabled: false,
   });
 
   const driveMiLayer = new FeatureLayer({
     url: DRIVE_MILE_URL,
-    definitionExpression: MOCK_AGENCY.defExpression,
     outFields: ["Station", "DIST1"],
     popupEnabled: false,
   });
@@ -1092,34 +1142,57 @@ require([
   // ── Map + View ────────────────────────────────────────────────────
   const map = new Map({
     basemap: "dark-gray-vector",
-    layers: [driveMiLayer, stationsLayer],  // stations on top
+    layers: [driveMiLayer, stationsLayer],
   });
 
   const view = new MapView({
     container: "the-map",
     map,
-    center: [-122.3, 47.5],   // WA default — goTo will navigate on first selection
-    zoom: 10,
+    center: [-122.3, 47.5],
+    zoom: 7,
   });
 
-  // ── Init services ─────────────────────────────────────────────────
   MapService.init(view, stationsLayer, driveMiLayer);
   StationService.init(stationsLayer);
 
   view.when(async () => {
     log("View ready", "state");
 
-    // Set agency context (replace with real OAuth resolver)
-    $agencyContext.set(MOCK_AGENCY);
-    log("$agencyContext set (mock — replace with OAuth resolver)", "state");
+    // ── Resolve identity → agency context ─────────────────────────
+    try {
+      const cred = await esriId.checkSignInStatus(AGOL_PORTAL + "sharing")
+        .catch(() => esriId.getCredential(AGOL_PORTAL + "sharing"));
 
-    // Load station list + snapshot from real layer
-    await StationService.loadAgencyStations(MOCK_AGENCY.defExpression);
-    await StationService.loadSnapshot(MOCK_AGENCY.defExpression);
+      const portalUsername = cred.userId;
+      log(`OAuth: signed in as "${portalUsername}"`, "state");
 
-    // Re-render cards now that station list is populated
-    renderCardStack();
-    log("App ready", "state");
+      const ctx = await AgencyService.resolve(portalUsername);
+
+      // Apply definitionExpression to both layers
+      stationsLayer.definitionExpression = ctx.defExpression;
+      driveMiLayer.definitionExpression  = ctx.defExpression;
+
+      // Set agency context atom — triggers ribbon + card stack render
+      $agencyContext.set(ctx);
+      log(`$agencyContext set for "${ctx.agencyName}"`, "state");
+
+      // Load station list + snapshot
+      await StationService.loadAgencyStations(ctx.defExpression);
+      await StationService.loadSnapshot(ctx.defExpression);
+      renderCardStack();
+
+      // Zoom to agency extent
+      await view.goTo(stationsLayer.fullExtent);
+
+      log("App ready", "state");
+
+    } catch (e) {
+      log(`Login failed: ${e.message}`, "side");
+      document.getElementById("right-panel").innerHTML =
+        `<div style="padding:1rem;font-size:0.8rem;color:var(--fph-text-muted)">
+          Login failed: ${e.message}
+        </div>`;
+    }
   });
 });
 </script>
