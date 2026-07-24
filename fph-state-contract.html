@@ -593,10 +593,11 @@ const MapService = (() => {
         r => r.layer === _stationsLayer
       );
       if (stationHit) {
-        // Hit test graphics may not carry all attributes — query by OBJECTID
-        const oid = stationHit.graphic.attributes["OBJECTID"];
+        // Hit test graphics may not carry all attributes — query by OID
+        const oidField = _stationsLayer.objectIdField || "OBJECTID";
+        const oid = stationHit.graphic.attributes[oidField];
         log(`hit: station graphic attrs = ${JSON.stringify(stationHit.graphic.attributes)}`, "side");
-        log(`hit: querying by OBJECTID=${oid}`, "side");
+        log(`hit: querying by ${oidField}=${oid}`, "side");
         try {
           const result = await _stationsLayer.queryFeatures({
             objectIds: [oid],
@@ -739,9 +740,8 @@ const StationService = (() => {
     try {
       const result = await _stationsLayer.queryFeatures({
         where: defExpression || "1=1",
-        outFields: ["STATION", "STATIONNAME", "DIST1", "FIRE_PROTE"],
+        outFields: ["STATION", "STATIONNAME", "DIST1"],
         returnGeometry: false,
-        orderByFields: ["STATION"],
       });
       _stations = result.features.map(f => ({
         stationId: f.attributes["STATION"],
