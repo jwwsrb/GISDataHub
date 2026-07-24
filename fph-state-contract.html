@@ -514,8 +514,8 @@ const StationService = (() => {
       log(`StationService: raw Station IDs = ${JSON.stringify(rawIds)}`, "side");
       _stations = r.features
         .map(f => ({
-          stationId: f.attributes["Station"],
-          label:     f.attributes["StationName"] || f.attributes["Station"],
+          stationId: String(f.attributes["Station"]).trim(),
+          label:     f.attributes["StationName"] || String(f.attributes["Station"]),
           district:  f.attributes["FIRE_DISTRICT"] || "",
           address:   f.attributes["StationAddress"] || "",
         }))
@@ -532,8 +532,8 @@ const StationService = (() => {
       const seen2 = new Set();
       _autoAidStations = r.features
         .map(f => ({
-          stationId: f.attributes["Station"],
-          label:     f.attributes["StationName"] || f.attributes["Station"],
+          stationId: String(f.attributes["Station"]).trim(),
+          label:     f.attributes["StationName"] || String(f.attributes["Station"]),
           district:  f.attributes["FIRE_DISTRICT"] || "",
           address:   f.attributes["StationAddress"] || "",
         }))
@@ -841,7 +841,7 @@ mapEl.addEventListener("arcgisViewReadyChange", async () => {
     // Load station list + snapshot
     await StationService.loadAgencyStations(ctx.defExpression, ctx.autoAidExpr);
     await StationService.loadSnapshot();
-    renderCardStack();
+    // $agencySnapshot subscription triggers renderCardStack automatically
 
     log("App ready", "state");
 
