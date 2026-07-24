@@ -16,52 +16,39 @@
   <!-- nanostores — inlined to avoid CDN/module timing issues -->
   <script>
   (function(global) {
-    // Minimal nanostores: atom + computed
     function atom(initial) {
       let value = initial;
       const listeners = [];
       const store = {
         get() { return value; },
-        set(next) {
-          value = next;
-          listeners.forEach(fn => fn(value));
-        },
+        set(next) { value = next; listeners.forEach(fn => fn(value)); },
         subscribe(fn) {
-          listeners.push(fn);
-          fn(value);
+          listeners.push(fn); fn(value);
           return () => { const i = listeners.indexOf(fn); if (i > -1) listeners.splice(i, 1); };
         }
       };
       return store;
     }
-
     function computed(deps, fn) {
       const sources = Array.isArray(deps) ? deps : [deps];
       let value = fn(...sources.map(s => s.get()));
       const listeners = [];
-      const recompute = () => {
-        value = fn(...sources.map(s => s.get()));
-        listeners.forEach(f => f(value));
-      };
+      const recompute = () => { value = fn(...sources.map(s => s.get())); listeners.forEach(f => f(value)); };
       sources.forEach(s => s.subscribe(() => recompute()));
       return {
         get() { return value; },
         subscribe(fn) {
-          listeners.push(fn);
-          fn(value);
+          listeners.push(fn); fn(value);
           return () => { const i = listeners.indexOf(fn); if (i > -1) listeners.splice(i, 1); };
         }
       };
     }
-
     global.nanostores = { atom, computed };
   })(window);
   </script>
 
   <style>
     :root {
-      --fph-rail-width: 3.5rem;
-      --fph-panel-width: 320px;
       --fph-right-width: 340px;
       --fph-ribbon-h: 2.5rem;
       --fph-bg: #f5f5f5;
@@ -96,7 +83,6 @@
       display: flex;
       align-items: center;
       padding: 0 1rem;
-      gap: 0;
       flex-shrink: 0;
       font-size: 0.78rem;
     }
@@ -107,7 +93,6 @@
       gap: 0.4rem;
       color: var(--fph-text-muted);
     }
-
     .ribbon-crumb button {
       background: none;
       border: none;
@@ -121,106 +106,14 @@
     .ribbon-crumb button:hover { color: var(--fph-text); background: var(--fph-surface2); }
     .ribbon-crumb button.active { color: var(--fph-text); font-weight: 600; }
     .ribbon-crumb button:disabled { cursor: default; }
-
-    .ribbon-sep {
-      margin: 0 0.25rem;
-      color: var(--fph-border);
-      user-select: none;
-      font-size: 0.9rem;
-    }
+    .ribbon-sep { margin: 0 0.25rem; color: var(--fph-border); user-select: none; font-size: 0.9rem; }
 
     /* ── Shell body ──────────────────────────────────────────────── */
-    #shell-body {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
-
-    /* ── Action Rail ─────────────────────────────────────────────── */
-    #action-rail {
-      width: var(--fph-rail-width);
-      background: var(--fph-surface);
-      border-right: 1px solid var(--fph-border);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 0.5rem 0;
-      gap: 0.25rem;
-      flex-shrink: 0;
-      z-index: 10;
-    }
-
-    .rail-btn {
-      width: 2.5rem;
-      height: 2.5rem;
-      border: none;
-      background: none;
-      cursor: pointer;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--fph-text-muted);
-      font-size: 1.1rem;
-      transition: color 0.15s, background 0.15s;
-      position: relative;
-    }
-    .rail-btn:hover { color: var(--fph-text); background: var(--fph-surface2); }
-    .rail-btn.active {
-      color: var(--fph-accent);
-      background: rgba(232,93,47,0.12);
-    }
-    .rail-btn title { display: none; }
-    .rail-tooltip {
-      position: absolute;
-      left: calc(100% + 8px);
-      top: 50%;
-      transform: translateY(-50%);
-      background: #0d1117;
-      color: var(--fph-text);
-      font-size: 0.72rem;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      white-space: nowrap;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.1s;
-      z-index: 100;
-    }
-    .rail-btn:hover .rail-tooltip { opacity: 1; }
-
-    /* ── Left Panel ──────────────────────────────────────────────── */
-    #left-panel {
-      width: 0;
-      overflow: hidden;
-      background: var(--fph-surface);
-      border-right: 1px solid var(--fph-border);
-      transition: width 0.2s ease;
-      flex-shrink: 0;
-    }
-    #left-panel.open { width: var(--fph-panel-width); }
-    #left-panel-inner {
-      width: var(--fph-panel-width);
-      height: 100%;
-      overflow-y: auto;
-      padding: 1rem;
-    }
-
-    .panel-title {
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--fph-text-muted);
-      margin-bottom: 0.75rem;
-    }
+    #shell-body { display: flex; flex: 1; overflow: hidden; }
 
     /* ── Map Area ────────────────────────────────────────────────── */
-    #map-area {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-    }
+    #map-area { flex: 1; position: relative; overflow: hidden; }
+    #map-area arcgis-map { width: 100%; height: 100%; }
 
     /* ── Right Panel ─────────────────────────────────────────────── */
     #right-panel {
@@ -234,259 +127,116 @@
     }
 
     /* ── Cards ───────────────────────────────────────────────────── */
-    .card {
-      border-bottom: 1px solid var(--fph-border);
-      overflow: hidden;
-      transition: all 0.2s ease;
-    }
-
+    .card { border-bottom: 1px solid var(--fph-border); overflow: hidden; }
     .card-header {
-      display: flex;
-      align-items: center;
-      padding: 0.75rem 1rem;
-      gap: 0.6rem;
-      cursor: pointer;
-      user-select: none;
-      transition: background 0.15s;
+      display: flex; align-items: center; padding: 0.75rem 1rem; gap: 0.6rem;
+      cursor: pointer; user-select: none; transition: background 0.15s;
     }
     .card-header:hover { background: var(--fph-surface2); }
-
     .card-icon {
-      width: 2rem;
-      height: 2rem;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1rem;
-      flex-shrink: 0;
+      width: 2rem; height: 2rem; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0;
     }
-    .icon-agency { background: rgba(232,93,47,0.15); color: var(--fph-accent); }
-    .icon-station { background: rgba(59,130,246,0.15); color: var(--fph-accent2); }
-    .icon-assets { background: rgba(139,92,246,0.15); color: #a78bfa; }
-
+    .icon-agency  { background: rgba(200,75,31,0.12); color: var(--fph-accent); }
+    .icon-station { background: rgba(26,115,184,0.12); color: var(--fph-accent2); }
+    .icon-assets  { background: rgba(139,92,246,0.12); color: #7c3aed; }
     .card-title-group { flex: 1; min-width: 0; }
-    .card-title { font-size: 0.82rem; font-weight: 600; color: var(--fph-text); }
+    .card-title   { font-size: 0.82rem; font-weight: 600; color: var(--fph-text); }
     .card-subtitle { font-size: 0.7rem; color: var(--fph-text-muted); margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    .card-chevron {
-      font-size: 0.7rem;
-      color: var(--fph-text-muted);
-      transition: transform 0.2s;
-    }
-    .card.expanded .card-chevron { transform: rotate(180deg); }
-
-    .card-body {
-      display: none;
-      padding: 0 1rem 1rem;
-    }
+    .card-body { display: none; padding: 0 1rem 1rem; }
     .card.expanded .card-body { display: block; }
+    .card.collapsed-strip .card-header { padding: 0.4rem 0.75rem; background: var(--fph-surface2); }
+    .card.collapsed-strip .card-title  { font-size: 0.75rem; }
+    .card.collapsed-strip .card-icon   { width: 1.5rem; height: 1.5rem; font-size: 0.8rem; }
 
-    /* collapsed header strip */
-    .card.collapsed-strip .card-header {
-      padding: 0.4rem 0.75rem;
-      background: var(--fph-surface2);
-    }
-    .card.collapsed-strip .card-title { font-size: 0.75rem; }
-    .card.collapsed-strip .card-icon { width: 1.5rem; height: 1.5rem; font-size: 0.8rem; }
+    /* ── Data grid ───────────────────────────────────────────────── */
+    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem; }
+    .data-item { background: var(--fph-surface2); border-radius: 6px; padding: 0.5rem 0.65rem; }
+    .data-item .di-val   { font-size: 1.1rem; font-weight: 700; color: var(--fph-text); line-height: 1; }
+    .data-item .di-label { font-size: 0.65rem; color: var(--fph-text-muted); margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }
 
-    /* ── Data rows ───────────────────────────────────────────────── */
-    .data-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-
-    .data-item {
-      background: var(--fph-surface2);
-      border-radius: 6px;
-      padding: 0.5rem 0.65rem;
-    }
-    .data-item .di-val {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--fph-text);
-      line-height: 1;
-    }
-    .data-item .di-label {
-      font-size: 0.65rem;
-      color: var(--fph-text-muted);
-      margin-top: 0.2rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .tag-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.3rem;
-      margin-top: 0.6rem;
-    }
-    .tag {
-      font-size: 0.67rem;
-      padding: 0.15rem 0.5rem;
-      border-radius: 12px;
-      background: var(--fph-tag-bg);
-      color: var(--fph-tag-text);
-      font-weight: 500;
-    }
-
-    .asset-list {
-      list-style: none;
-      margin-top: 0.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
+    .asset-list { list-style: none; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem; }
     .asset-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: var(--fph-surface2);
-      border-radius: 6px;
-      padding: 0.45rem 0.65rem;
-      font-size: 0.75rem;
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--fph-surface2); border-radius: 6px; padding: 0.45rem 0.65rem; font-size: 0.75rem;
     }
-    .asset-item .ai-name { color: var(--fph-text); }
-    .asset-item .ai-count {
-      font-size: 0.7rem;
-      font-weight: 600;
-      color: var(--fph-text-muted);
-      background: rgba(255,255,255,0.06);
-      padding: 0.1rem 0.4rem;
-      border-radius: 10px;
-    }
+    .asset-item .ai-name  { color: var(--fph-text); }
+    .asset-item .ai-count { font-size: 0.7rem; font-weight: 600; color: var(--fph-text-muted); padding: 0.1rem 0.4rem; border-radius: 10px; }
 
-    /* ── Log panel ───────────────────────────────────────────────── */
-    #log-panel {
-      position: fixed;
-      bottom: 0;
-      right: var(--fph-right-width);
-      width: 380px;
-      background: #f8f8f8;
-      border: 1px solid var(--fph-border);
-      border-bottom: none;
-      border-radius: 8px 8px 0 0;
-      font-family: "JetBrains Mono", "Fira Code", monospace;
-      font-size: 0.68rem;
-      z-index: 50;
-      overflow: hidden;
-    }
-    #log-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.35rem 0.75rem;
-      background: var(--fph-surface2);
-      cursor: pointer;
-      user-select: none;
-      font-size: 0.7rem;
-      color: var(--fph-text-muted);
-    }
-    #log-header .log-title { font-weight: 600; color: var(--fph-text); }
-    #log-body { height: 140px; overflow-y: auto; padding: 0.5rem 0.75rem; display: flex; flex-direction: column-reverse; }
-    .log-entry { padding: 0.15rem 0; color: #1a6b3a; line-height: 1.4; }
-    .log-entry.action { color: #1a56b8; }
-    .log-entry.state { color: #7a5c00; }
-    .log-entry.side { color: #6b3a9e; }
-    .log-entry.stub { color: var(--fph-text-muted); font-style: italic; }
-
-    .clear-log { font-size: 0.65rem; color: var(--fph-text-muted); cursor: pointer; }
-    .clear-log:hover { color: var(--fph-text); }
-
-    /* ── Search stub in panel ────────────────────────────────────── */
-    .search-input {
-      width: 100%;
-      background: var(--fph-surface2);
-      border: 1px solid var(--fph-border);
-      border-radius: 6px;
-      color: var(--fph-text);
-      font-size: 0.8rem;
-      padding: 0.5rem 0.75rem;
-      outline: none;
-      margin-bottom: 0.75rem;
-    }
-    .search-input:focus { border-color: var(--fph-accent2); }
-    ::placeholder { color: var(--fph-text-muted); }
-
-    .search-result {
-      padding: 0.5rem 0.6rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.78rem;
-      color: var(--fph-text);
-      transition: background 0.12s;
-    }
-    .search-result:hover { background: var(--fph-surface2); }
-    .search-result .sr-id { font-size: 0.67rem; color: var(--fph-text-muted); }
-
-    /* ── Misc ────────────────────────────────────────────────────── */
     .section-label {
-      font-size: 0.65rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--fph-text-muted);
-      margin: 0.75rem 0 0.35rem;
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--fph-text-muted); margin: 0.75rem 0 0.35rem;
     }
 
     .mode-badge {
-      font-size: 0.62rem;
-      padding: 0.1rem 0.45rem;
-      border-radius: 10px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      background: rgba(232,93,47,0.15);
-      color: var(--fph-accent);
-      margin-left: auto;
+      font-size: 0.62rem; padding: 0.1rem 0.45rem; border-radius: 10px;
+      font-weight: 600; letter-spacing: 0.04em;
+      background: rgba(200,75,31,0.12); color: var(--fph-accent); margin-left: auto;
     }
-    .mode-badge.home { background: rgba(16,185,129,0.12); color: #34d399; }
+    .mode-badge.home { background: rgba(16,185,129,0.1); color: #059669; }
+
+    .search-result { padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.78rem; color: var(--fph-text); transition: background 0.12s; }
+    .search-result:hover { background: var(--fph-surface2); }
+    .search-result .sr-id { font-size: 0.67rem; color: var(--fph-text-muted); }
+
+    /* ── Dev Log ─────────────────────────────────────────────────── */
+    #log-panel {
+      position: fixed; bottom: 0; right: var(--fph-right-width); width: 380px;
+      background: #f8f8f8; border: 1px solid var(--fph-border); border-bottom: none;
+      border-radius: 8px 8px 0 0; font-family: "JetBrains Mono","Fira Code",monospace;
+      font-size: 0.68rem; z-index: 50; overflow: hidden;
+    }
+    #log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.35rem 0.75rem; background: var(--fph-surface2); cursor: pointer;
+      user-select: none; font-size: 0.7rem; color: var(--fph-text-muted);
+    }
+    #log-header .log-title { font-weight: 600; color: var(--fph-text); }
+    #log-body { height: 140px; overflow-y: auto; padding: 0.5rem 0.75rem; display: flex; flex-direction: column-reverse; }
+    .log-entry        { padding: 0.15rem 0; color: #1a6b3a; line-height: 1.4; }
+    .log-entry.action { color: #1a56b8; }
+    .log-entry.state  { color: #7a5c00; }
+    .log-entry.side   { color: #6b3a9e; }
+    .clear-log { font-size: 0.65rem; color: var(--fph-text-muted); cursor: pointer; }
+    .clear-log:hover { color: var(--fph-text); }
   </style>
 </head>
 <body>
 
   <!-- Context Ribbon -->
-  <div id="ribbon">
-    <!-- populated by renderRibbon() -->
-  </div>
+  <div id="ribbon"></div>
 
   <div id="shell-body">
 
-    <!-- Action Rail -->
-    <nav id="action-rail">
-      <button class="rail-btn" data-panel="search" onclick="SelectionService.setPanel('search')">
-        🔍<span class="rail-tooltip">Search</span>
-      </button>
-      <button class="rail-btn" data-panel="layers" onclick="SelectionService.setPanel('layers')">
-        ⊞<span class="rail-tooltip">Layers</span>
-      </button>
-      <button class="rail-btn" data-panel="legend" onclick="SelectionService.setPanel('legend')">
-        ≡<span class="rail-tooltip">Legend</span>
-      </button>
-      <button class="rail-btn" data-panel="reports" onclick="SelectionService.setPanel('reports')">
-        📄<span class="rail-tooltip">Reports</span>
-      </button>
-    </nav>
-
-    <!-- Left Panel -->
-    <div id="left-panel">
-      <div id="left-panel-inner" id="left-panel-content">
-        <!-- populated by renderLeftPanel() -->
-      </div>
-    </div>
-
-    <!-- Map Area -->
+    <!-- Map Area — native JSAPI widgets slotted in -->
     <main id="map-area">
-      <arcgis-map id="the-map" item-id="" style="width:100%;height:100%">
-        <arcgis-zoom position="top-left"></arcgis-zoom>
+      <arcgis-map id="the-map" basemap="topo-vector" center="-120.5,47.5" zoom="7">
+
+        <!-- Top-left widget stack (matches standard Portal web map layout) -->
+        <arcgis-home             slot="top-left"></arcgis-home>
+        <arcgis-expand slot="top-left" expand-icon="basemap"  expand-tooltip="Basemaps" auto-collapse>
+          <arcgis-basemap-gallery></arcgis-basemap-gallery>
+        </arcgis-expand>
+        <arcgis-expand slot="top-left" expand-icon="layers"   expand-tooltip="Layers">
+          <arcgis-layer-list></arcgis-layer-list>
+        </arcgis-expand>
+        <arcgis-expand slot="top-left" expand-icon="legend"   expand-tooltip="Legend" auto-collapse>
+          <arcgis-legend></arcgis-legend>
+        </arcgis-expand>
+        <arcgis-zoom             slot="top-left"></arcgis-zoom>
+
+        <!-- Search: top-right -->
+        <arcgis-search slot="top-right"></arcgis-search>
+
+        <!-- Scale bar: bottom-left -->
+        <arcgis-scale-bar slot="bottom-left" unit="dual"></arcgis-scale-bar>
+
       </arcgis-map>
     </main>
 
     <!-- Right Card Stack -->
-    <aside id="right-panel">
-      <!-- populated by renderCardStack() -->
-    </aside>
+    <aside id="right-panel"></aside>
 
   </div>
 
@@ -500,80 +250,179 @@
   </div>
 
 <script>
-// ─────────────────────────────────────────────────────────────────────────────
-// nanostores — from inline implementation above
-// ─────────────────────────────────────────────────────────────────────────────
 const { atom, computed } = window.nanostores;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LAYER URLs
+// CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
-const AGOL_CLIENT_ID       = "tS3sgaCh7cedVjCu";
-const AGOL_PORTAL          = "https://wsrb.maps.arcgis.com/";
-const STATIONS_URL         = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Fire_Stations/FeatureServer/0";
-const DRIVE_MILE_URL       = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Drive_Mile_Disks/FeatureServer/1";
-const FPD_URL              = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/FPD_Boundaries/FeatureServer/0";
-const USERNAMES_ITEM_ID    = "a634dbad39de45ffb555381018c64892";
+const AGOL_CLIENT_ID    = "tS3sgaCh7cedVjCu";
+const AGOL_PORTAL       = "https://wsrb.maps.arcgis.com/";
+const STATIONS_URL      = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Fire_Stations/FeatureServer/0";
+const DRIVE_MILE_URL    = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Drive_Mile_Disks/FeatureServer/1";
+const FPD_URL           = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/FPD_Boundaries/FeatureServer/0";
+const USERNAMES_ITEM_ID = "a634dbad39de45ffb555381018c64892";
+const sqlQuote = s => `'${s.replace(/'/g, "''")}'`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROPER CASE HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+const LOWERCASE_EX = new Set(["a","an","and","at","but","by","for","in","nor","of","on","or","so","the","to","up","yet"]);
+const UPPERCASE_EX = new Set(["ii","iii","iv","vi","vii","viii","ix","ne","nw","se","sw","us","sr","wa","llc","inc","ltd","lp","llp","f.p.d.","f.p.d","fpd","ems","rfa"]);
+
+function properCase(str) {
+  if (!str) return str;
+  const words = str.toLowerCase().split(" ");
+  const result = words.map((word, i) => {
+    if (!word) return word;
+    if (UPPERCASE_EX.has(word)) return word.toUpperCase();
+    if (i > 0 && LOWERCASE_EX.has(word)) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  });
+  const last = result.length - 1;
+  if (result[last]) result[last] = result[last].charAt(0).toUpperCase() + result[last].slice(1);
+  return result.join(" ");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER RENDERERS + LABEL CLASSES
+// (defined here so AgencyService can reference them; LabelClass injected after AMD loads)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// FPD boundaries — thin dark-red fill + outline; thicker outer boundary
+// achieved via a GraphicsLayer dissolve (Option B — no second hosted layer)
+const FPD_RENDERER = {
+  type:   "simple",
+  symbol: {
+    type:    "simple-fill",
+    color:   [139, 0, 0, 0.06],
+    outline: { color: [139, 0, 0], width: 1.5 },
+  },
+};
+
+// Drive mile — unique-value by tobreak (radius in miles)
+const DRIVE_MILE_RENDERER = {
+  type:  "unique-value",
+  field: "tobreak",
+  uniqueValueInfos: [
+    { value: 1.5, label: "1.5 mi", symbol: { type: "simple-fill", color: [237, 81,  81,  180], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 2.5, label: "2.5 mi", symbol: { type: "simple-fill", color: [20,  158, 206, 180], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 5,   label: "5 mi",   symbol: { type: "simple-fill", color: [148, 103, 189, 180], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 7,   label: "7 mi",   symbol: { type: "simple-fill", color: [240, 150, 50,  180], outline: { color: [255,255,255], width: 0.5 } } },
+  ],
+};
+
+// Station — web-style fire-station symbol (Esri 2D symbol library)
+const STATION_RENDERER = {
+  type:   "simple",
+  symbol: {
+    type:      "web-style",
+    name:      "fire-station",
+    styleName: "Esri2DPointSymbolsStyle",
+  },
+};
+
+// Station label class factory — primary uses size 13, auto-aid uses size 11
+// LabelClass constructor injected as window._LabelClass after AMD loads
+const makeLabelClass = (size = 13) => new window._LabelClass({
+  labelExpressionInfo: {
+    expression: `$feature["StationName"] + " (" + $feature["Station"] + ")"`,
+  },
+  symbol: {
+    type:      "text",
+    color:     [80, 80, 80],
+    haloColor: [255, 255, 255],
+    haloSize:  1,
+    font:      { family: "Arial", style: "normal", weight: "normal", size },
+    xoffset:   -8,
+    yoffset:   11,
+  },
+  labelPlacement: "center-right",
+});
+
+// FPD label class
+const makeFPDLabelClass = (size = 12) => new window._LabelClass({
+  labelExpressionInfo: { expression: `$feature.fpd_desc` },
+  symbol: {
+    type:      "text",
+    color:     [168, 0, 0, 199],
+    haloColor: [252, 250, 250],
+    haloSize:  2,
+    font:      { family: "Roboto", weight: "bold", size },
+  },
+  labelPlacement: "always-horizontal",
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AGENCY SERVICE — resolves portal username → agency context at login
-// Chain: portal_user → fire_prote → FPD_CODEs → definitionExpression
+// Chain: portal_user → fire_prote → FPD_CODEs + geometry → defExpressions
 // ─────────────────────────────────────────────────────────────────────────────
 const AgencyService = (() => {
 
-  /**
-   * resolve(portalUsername) → $agencyContext payload
-   * Step 1: query FireAgencyUsernames → fire_prote
-   * Step 2: query FPD_WA_only        → list of FPD_CODEs
-   * Step 3: build DIST1 IN (...)     → definitionExpression
-   */
   async function resolve(portalUsername) {
     log(`AgencyService: resolving "${portalUsername}"`, "state");
 
-    // ── Step 1: username → fire_prote ────────────────────────────────
-    const usernamesTable = new window._FeatureLayer({
-      portalItem: { id: USERNAMES_ITEM_ID },
-    });
+    // Step 1: username → fire_prote
+    const usernamesTable = new window._FeatureLayer({ portalItem: { id: USERNAMES_ITEM_ID } });
     const userResult = await usernamesTable.queryFeatures({
       where: `portal_user = '${portalUsername}'`,
       outFields: ["portal_user", "fire_prote"],
       returnGeometry: false,
     });
-
-    if (!userResult.features.length) {
-      throw new Error(`No agency found for portal user "${portalUsername}"`);
-    }
+    if (!userResult.features.length) throw new Error(`No agency found for portal user "${portalUsername}"`);
 
     const fire_prote = userResult.features[0].attributes["fire_prote"];
     log(`AgencyService: fire_prote = "${fire_prote}"`, "state");
 
-    // ── Step 2: fire_prote → FPD_CODEs ──────────────────────────────
-    const fpdLayer = new window._FeatureLayer({ url: FPD_URL });
-    const fpdResult = await fpdLayer.queryFeatures({
-      where: `fire_prote = '${fire_prote.replace(/'/g, "''")}'`,
+    // Step 2: fire_prote → FPD_CODEs + unioned geometry (for agency boundary GraphicsLayer)
+    const fpdQueryLayer = new window._FeatureLayer({ url: FPD_URL });
+    const fpdResult = await fpdQueryLayer.queryFeatures({
+      where: `fire_prote = ${sqlQuote(fire_prote)}`,
       outFields: ["FPD_CODE"],
-      returnGeometry: false,
+      returnGeometry: true,
+      outSpatialReference: { wkid: 102100 },
     });
-
-    if (!fpdResult.features.length) {
-      throw new Error(`No FPD_CODEs found for agency "${fire_prote}"`);
-    }
+    if (!fpdResult.features.length) throw new Error(`No FPD_CODEs found for agency "${fire_prote}"`);
 
     const fpdCodes = fpdResult.features.map(f => f.attributes["FPD_CODE"]);
     log(`AgencyService: FPD_CODEs = [${fpdCodes.join(", ")}]`, "state");
 
-    // ── Step 3: build definitionExpression ──────────────────────────
+    // Union FPD geometries → single agency boundary polygon
+    let agencyGeometry = null;
+    try {
+      const geometries = fpdResult.features.map(f => f.geometry);
+      agencyGeometry = geometries.length === 1
+        ? geometries[0]
+        : window._unionOperator.executeMany(geometries);
+      log(`AgencyService: agency boundary geometry computed`, "state");
+    } catch(e) {
+      log(`AgencyService: geometry union failed (${e.message}) — boundary layer skipped`, "side");
+    }
+
+    // Step 3: build definition expressions
     const inList = fpdCodes.map(c => `'${c}'`).join(", ");
-    const defExpression = `DIST1 IN (${inList})`;
+    const defExpression    = `DIST1 IN (${inList})`;
+    const fpdDefExpression = `fire_prote = ${sqlQuote(fire_prote)}`;
+
+    // Auto-aid expression — stations whose DIST2-24 contain any of the agency's FPD codes
+    // but whose DIST1 is NOT one of them (i.e. not a primary station for this agency)
+    const distClause = fpdCodes.length === 1
+      ? `= '${fpdCodes[0]}'`
+      : `IN (${inList})`;
+    const autoAidExpr = `(${
+      Array.from({ length: 23 }, (_, i) => `DIST${i + 2} ${distClause}`).join(" OR ")
+    }) AND DIST1 NOT IN (${inList})`;
+
     log(`AgencyService: defExpression = "${defExpression}"`, "state");
 
     return {
-      agencyName:      fire_prote,
+      agencyName:      properCase(fire_prote),
       fire_prote,
       portalUsername,
       fpdCodes,
       defExpression,
-      fpdDefExpression: `fire_prote = '${fire_prote.replace(/'/g, "''")}'`,
+      fpdDefExpression,
+      autoAidExpr,
+      agencyGeometry,
     };
   }
 
@@ -583,142 +432,94 @@ const AgencyService = (() => {
 // ─────────────────────────────────────────────────────────────────────────────
 // SOURCE ATOMS
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** { stationId: string | null, label: string, district: string } — stable Station key, never OBJECTID */
-const $selection = atom({ stationId: null, label: "", district: "" });
-
-/** Set once after OAuth resolves; read-only after */
+const $selection     = atom({ stationId: null, label: "", district: "" });
 const $agencyContext = atom(null);
-
-/** UI-only — selection logic must never read this */
-const $panelState = atom({ openRailPanel: null });
-
-/** Session-cached home-state counts. Cache, not truth. */
 const $agencySnapshot = atom(null);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPUTED STORES
 // ─────────────────────────────────────────────────────────────────────────────
+const $mode = computed($selection, sel => sel.stationId === null ? "home" : "station");
 
-/** 'home' | 'station' — derived from $selection only */
-const $mode = computed($selection, sel =>
-  sel.stationId === null ? "home" : "station"
-);
-
-/** Ordered ribbon entries — derived from $agencyContext + $selection */
 const $breadcrumb = computed([$agencyContext, $selection], (ctx, sel) => {
   if (!ctx) return [];
-  const crumbs = [{
-    label: ctx.agencyName,
-    action: sel.stationId ? () => SelectionService.clearSelection() : null,
-  }];
-  if (sel.stationId) {
-    crumbs.push({ label: sel.stationId, action: null });
-  }
+  const crumbs = [{ label: ctx.agencyName, action: sel.stationId ? () => SelectionService.clearSelection() : null }];
+  if (sel.stationId) crumbs.push({ label: sel.label || sel.stationId, action: null });
   return crumbs;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAP SERVICE — owns the view, layers, hit test, highlight, goTo
+// MAP SERVICE
 // ─────────────────────────────────────────────────────────────────────────────
 const MapService = (() => {
   let _view          = null;
   let _stationsLayer = null;
-  let _driveMiLayer  = null;
-  let _highlight     = null;   // current highlight handle
+  let _highlight     = null;
 
-  function init(view, stationsLayer, driveMiLayer) {
+  function init(view, stationsLayer) {
     _view          = view;
     _stationsLayer = stationsLayer;
-    _driveMiLayer  = driveMiLayer;
 
-    // Wire map click → SelectionService (Task 2 deliverable)
     _view.on("click", async (event) => {
       const hitResult = await _view.hitTest(event, {
         include: [_stationsLayer],
-        tolerance: 6,  // pixels — default is 13, tighter reduces accidental hits
+        tolerance: 6,
       });
 
-      // Only clear selection on a true empty click (no station hit)
-      const stationHit = hitResult.results.find(
-        r => r.layer === _stationsLayer
-      );
+      const stationHit = hitResult.results.find(r => r.layer === _stationsLayer);
 
       if (!stationHit) {
-        // Don't clear on every non-station click — only if nothing was hit at all
-        // (drive mile / hydrant buffer clicks fall through silently)
-        if (!hitResult.results.length) {
-          SelectionService.clearSelection();
-        }
-        return;
-      }
-      if (stationHit) {
-        const oidField = _stationsLayer.objectIdField || "OBJECTID";
-        const oid = stationHit.graphic.attributes[oidField];
-        log(`hit: station graphic attrs = ${JSON.stringify(stationHit.graphic.attributes)}`, "side");
-        log(`hit: querying by ${oidField}=${oid}`, "side");
-        try {
-          const result = await _stationsLayer.queryFeatures({
-            objectIds: [oid],
-            outFields: ["Station", "StationName", "FIRE_DISTRICT"],
-            returnGeometry: false,
-          });
-          const attrs = result.features[0]?.attributes;
-          const stationId = attrs?.["Station"];
-          log(`hit: station layer → Station="${stationId}"`, "action");
-          SelectionService.selectStation(stationId, "map", {
-            label:    attrs?.["StationName"] || stationId,
-            district: attrs?.["FIRE_DISTRICT"] || "",
-          });
-        } catch(e) {
-          log(`hit: station attribute query failed: ${e.message}`, "side");
-        }
+        if (!hitResult.results.length) SelectionService.clearSelection();
         return;
       }
 
-      // Anything else (drive miles, hydrant buffers) — display only, fall through
-      log("hit: display-only layer — ignoring", "side");
+      const oidField = _stationsLayer.objectIdField || "OBJECTID";
+      const oid      = stationHit.graphic.attributes[oidField];
+      try {
+        const result = await _stationsLayer.queryFeatures({
+          objectIds:      [oid],
+          outFields:      ["Station", "StationName", "FIRE_DISTRICT"],
+          returnGeometry: false,
+        });
+        const attrs     = result.features[0]?.attributes;
+        const stationId = attrs?.["Station"];
+        log(`hit: Station="${stationId}"`, "action");
+        SelectionService.selectStation(stationId, "map", {
+          label:    attrs?.["StationName"] || stationId,
+          district: attrs?.["FIRE_DISTRICT"] || "",
+        });
+      } catch(e) {
+        log(`hit: query failed: ${e.message}`, "side");
+      }
     });
 
-    log("MapService ready — hit test wired", "state");
+    log("MapService ready", "state");
   }
 
-  /** Zoom to a station point feature by STATION key */
   async function goToStation(stationId) {
     if (!_view || !_stationsLayer) return;
     try {
       const result = await _stationsLayer.queryFeatures({
-        where: `Station = '${stationId}'`,
-        returnGeometry: true,
-        outFields: ["Station"],
+        where: `Station = '${stationId}'`, returnGeometry: true, outFields: ["Station"],
       });
       if (result.features.length) {
         await _view.goTo({ target: result.features[0].geometry, zoom: 14 });
-        log(`goTo: zoomed to ${stationId}`, "side");
       }
-    } catch (e) {
-      log(`goTo failed for ${stationId}: ${e.message}`, "side");
-    }
+    } catch(e) { log(`goTo failed: ${e.message}`, "side"); }
   }
 
-  /** Highlight a station feature by STATION key; clears previous */
   async function highlightStation(stationId) {
     if (!_view || !_stationsLayer) return;
     clearHighlight();
     try {
       const layerView = await _view.whenLayerView(_stationsLayer);
       const result = await _stationsLayer.queryFeatures({
-        where: `Station = '${stationId}'`,
-        returnGeometry: false,
-        outFields: ["OBJECTID"],
+        where: `Station = '${stationId}'`, returnGeometry: false, outFields: ["OBJECTID"],
       });
       if (result.features.length) {
         _highlight = layerView.highlight(result.features);
-        log(`highlight: applied to ${stationId}`, "side");
       }
-    } catch (e) {
-      log(`highlight failed for ${stationId}: ${e.message}`, "side");
-    }
+    } catch(e) { log(`highlight failed: ${e.message}`, "side"); }
   }
 
   function clearHighlight() {
@@ -729,114 +530,74 @@ const MapService = (() => {
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SELECTION SERVICE — sole writer of atoms; components never set directly
+// SELECTION SERVICE
 // ─────────────────────────────────────────────────────────────────────────────
 const SelectionService = (() => {
 
-  /**
-   * selectStation(stationId, source)
-   * source: 'map' | 'search' | 'list' | 'ribbon'
-   * map       → highlight only, no re-zoom (feature already visible)
-   * search/list → highlight + goTo
-   * ribbon    → highlight only
-   */
   function selectStation(stationId, source = "map", display = {}) {
     log(`selectStation("${stationId}", source="${source}")`, "action");
     $selection.set({ stationId, label: display.label || stationId, district: display.district || "" });
-
     MapService.highlightStation(stationId);
-
-    if (source === "search" || source === "list") {
-      MapService.goToStation(stationId);
-    }
-
+    if (source === "search" || source === "list") MapService.goToStation(stationId);
     log(`$selection → ${JSON.stringify($selection.get())}`, "state");
   }
 
-  /** Return to home mode */
   function clearSelection() {
     log("clearSelection()", "action");
     $selection.set({ stationId: null, label: "", district: "" });
     MapService.clearHighlight();
-    log(`$selection → ${JSON.stringify($selection.get())}`, "state");
   }
 
-  /** Toggle rail panel — UI-only, never read by selection logic */
-  function setPanel(panelId) {
-    const current = $panelState.get().openRailPanel;
-    const next = current === panelId ? null : panelId;
-    log(`setPanel("${panelId}") → ${next}`, "action");
-    $panelState.set({ openRailPanel: next });
-  }
-
-  return { selectStation, clearSelection, setPanel };
+  return { selectStation, clearSelection };
 })();
 
 window.SelectionService = SelectionService;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STATION SERVICE — loads layer data for cards and snapshot
+// STATION SERVICE
 // ─────────────────────────────────────────────────────────────────────────────
 const StationService = (() => {
   let _stationsLayer = null;
-  let _stations      = [];   // in-memory list for search panel
+  let _stations      = [];
 
-  function init(stationsLayer) {
-    _stationsLayer = stationsLayer;
-  }
+  function init(stationsLayer) { _stationsLayer = stationsLayer; }
 
   async function loadAgencyStations(defExpression) {
     if (!_stationsLayer) return [];
     try {
       const result = await _stationsLayer.queryFeatures({
         where: defExpression || "1=1",
-        outFields: ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
+        outFields: ["Station", "StationName", "FIRE_DISTRICT"],
         returnGeometry: false,
       });
       _stations = result.features.map(f => ({
         stationId: f.attributes["Station"],
         label:     f.attributes["StationName"] || f.attributes["Station"],
         district:  f.attributes["FIRE_DISTRICT"] || "",
-        address:   f.attributes["DIST1"] || "",
       }));
       log(`StationService: loaded ${_stations.length} stations`, "state");
       return _stations;
-    } catch (e) {
-      log(`StationService query failed: ${e.message}`, "side");
-      return [];
-    }
+    } catch(e) { log(`StationService query failed: ${e.message}`, "side"); return []; }
   }
 
   async function loadSnapshot(defExpression) {
     if (!_stationsLayer) return null;
     try {
-      const count = await _stationsLayer.queryFeatureCount({
-        where: defExpression || "1=1",
-      });
-      const snap = {
-        stationCount: count,
-        hydrantCount: "—",   // hydrant layer query added when layer is wired
-        bufferCoverage: "—",
-        loadedAt: new Date().toISOString(),
-      };
+      const count = await _stationsLayer.queryFeatureCount({ where: defExpression || "1=1" });
+      const snap = { stationCount: count, hydrantCount: "—", bufferCoverage: "—", loadedAt: new Date().toISOString() };
       $agencySnapshot.set(snap);
       log(`StationService: snapshot set (${count} stations)`, "state");
       return snap;
-    } catch (e) {
-      log(`StationService snapshot failed: ${e.message}`, "side");
-      return null;
-    }
+    } catch(e) { log(`StationService snapshot failed: ${e.message}`, "side"); return null; }
   }
 
   function getStations() { return _stations; }
-
   return { init, loadAgencyStations, loadSnapshot, getStations };
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RENDERING
 // ─────────────────────────────────────────────────────────────────────────────
-
 function renderRibbon() {
   const ribbon = document.getElementById("ribbon");
   const crumbs = $breadcrumb.get();
@@ -849,91 +610,13 @@ function renderRibbon() {
   }
 
   const parts = crumbs.map((c, i) => {
-    const sep = i > 0 ? `<span class="ribbon-sep">›</span>` : "";
+    const sep    = i > 0 ? `<span class="ribbon-sep">›</span>` : "";
     const isLast = i === crumbs.length - 1;
-    if (isLast || !c.action) {
-      return `${sep}<span class="ribbon-crumb"><button class="active" disabled>${c.label}</button></span>`;
-    }
+    if (isLast || !c.action) return `${sep}<span class="ribbon-crumb"><button class="active" disabled>${c.label}</button></span>`;
     return `${sep}<span class="ribbon-crumb"><button onclick="SelectionService.clearSelection()">${c.label}</button></span>`;
   }).join("");
 
   ribbon.innerHTML = parts + badge;
-}
-
-function renderRailButtons() {
-  const { openRailPanel } = $panelState.get();
-  document.querySelectorAll(".rail-btn").forEach(btn =>
-    btn.classList.toggle("active", btn.dataset.panel === openRailPanel)
-  );
-  document.getElementById("left-panel").classList.toggle("open", openRailPanel !== null);
-}
-
-function renderLeftPanel() {
-  const { openRailPanel } = $panelState.get();
-  const inner = document.getElementById("left-panel-inner");
-  if (!openRailPanel) { inner.innerHTML = ""; return; }
-
-  const titles = { search: "Search", layers: "Layers", legend: "Legend", reports: "Reports" };
-  let content = `<p class="panel-title">${titles[openRailPanel]}</p>`;
-
-  if (openRailPanel === "search") {
-    content += `
-      <input class="search-input" placeholder="Station name or ID…"
-             oninput="handleSearchInput(this.value)" id="search-input" />
-      <div id="search-results"></div>`;
-  } else if (openRailPanel === "layers") {
-    content += `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
-        <span>⬡ FPD Boundaries</span><span style="font-size:0.65rem">display</span>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
-        <span>● Fire Stations</span><span style="font-size:0.65rem">selectable</span>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
-        <span>⬡ Drive Miles</span><span style="font-size:0.65rem">display</span>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;font-size:0.78rem;color:var(--fph-text-muted)">
-        <span>⬡ Hydrant Buffers</span><span style="font-size:0.65rem;color:#a78bfa">display-only</span>
-      </div>`;
-  } else if (openRailPanel === "legend") {
-    content += `
-      <div class="section-label">Stations</div>
-      <div style="font-size:0.75rem;color:var(--fph-text-muted)">● Point — selectable</div>
-      <div class="section-label" style="margin-top:0.75rem">Drive Miles</div>
-      <div style="font-size:0.75rem;color:var(--fph-text-muted)">⬡ Polygon — proxy for station</div>
-      <div class="section-label" style="margin-top:0.75rem">Hydrant Buffers</div>
-      <div style="font-size:0.75rem;color:#a78bfa">⬡ Display-only — not selectable</div>`;
-  } else if (openRailPanel === "reports") {
-    content += `<div style="font-size:0.75rem;color:var(--fph-text-muted)">Report generation — future task</div>`;
-  }
-
-  inner.innerHTML = content;
-  if (openRailPanel === "search") renderSearchResults("");
-}
-
-window.handleSearchInput = function(val) { renderSearchResults(val); };
-
-function renderSearchResults(query) {
-  const el = document.getElementById("search-results");
-  if (!el) return;
-  const stations = StationService.getStations();
-  const q = query.trim().toLowerCase();
-  const matches = q.length === 0
-    ? stations
-    : stations.filter(s =>
-        s.label.toLowerCase().includes(q) ||
-        s.stationId.toLowerCase().includes(q)
-      );
-
-  if (!matches.length) {
-    el.innerHTML = `<p style="font-size:0.75rem;color:var(--fph-text-muted);padding:0.5rem 0">No stations match</p>`;
-    return;
-  }
-  el.innerHTML = matches.map(s => `
-    <div class="search-result" onclick="SelectionService.selectStation('${s.stationId}','search',{label:'${s.label.replace(/'/g,"\\'")}',district:'${s.district.replace(/'/g,"\\'")}' })">
-      <div>${s.label}</div>
-      <div class="sr-id">${s.district}</div>
-    </div>`).join("");
 }
 
 function renderCardStack() {
@@ -951,11 +634,7 @@ function renderCardStack() {
   if (mode === "home") {
     right.innerHTML = agencyCardExpanded(ctx, snap);
   } else {
-    const station = {
-      stationId: sel.stationId,
-      label:     sel.label || sel.stationId,
-      district:  sel.district || "",
-    };
+    const station = { stationId: sel.stationId, label: sel.label || sel.stationId, district: sel.district || "" };
     right.innerHTML = agencyCardCollapsed(ctx) + stationCard(station) + relatedAssetsList(station);
   }
 }
@@ -968,32 +647,28 @@ function agencyCardExpanded(ctx, snap) {
         <div class="card-icon icon-agency">🏛️</div>
         <div class="card-title-group">
           <div class="card-title">${ctx.agencyName}</div>
-          <div class="card-subtitle">FDID ${ctx.fdid}</div>
+          <div class="card-subtitle">${ctx.portalUsername}</div>
         </div>
       </div>
       <div class="card-body">
-        <div class="tag-row">
-          <span class="tag">${ctx.agencyCode}</span>
-          <span class="tag">${ctx.portalUsername}</span>
-        </div>
         ${snap ? `
-        <div class="data-grid" style="margin-top:0.75rem">
+        <div class="data-grid" style="margin-top:0.5rem">
           <div class="data-item"><div class="di-val">${snap.stationCount}</div><div class="di-label">Stations</div></div>
           <div class="data-item"><div class="di-val">${snap.hydrantCount}</div><div class="di-label">Hydrants</div></div>
           <div class="data-item"><div class="di-val">${snap.bufferCoverage}</div><div class="di-label">Buffer Cov.</div></div>
           <div class="data-item"><div class="di-val">—</div><div class="di-label">Drive-Mi Zones</div></div>
         </div>
-        <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.6rem">
-          Snapshot loaded ${new Date(snap.loadedAt).toLocaleTimeString()} — cache, not live
+        <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.5rem">
+          Snapshot ${new Date(snap.loadedAt).toLocaleTimeString()} — cache, not live
         </p>` : `<p style="font-size:0.75rem;color:var(--fph-text-muted);margin-top:0.5rem">Loading data…</p>`}
         ${stations.length ? `
         <div class="section-label" style="margin-top:0.9rem">Stations</div>
         <ul class="asset-list">
           ${stations.map(s => `
             <li class="asset-item" style="cursor:pointer"
-                onclick="SelectionService.selectStation('${s.stationId}','list',{label:'${s.label.replace(/'/g,"\\'")}',district:'${s.district.replace(/'/g,"\\'")}' })">
+                onclick="SelectionService.selectStation('${s.stationId}','list',{label:${JSON.stringify(s.label)},district:${JSON.stringify(s.district)}})">
               <span class="ai-name">${s.label}</span>
-              <span class="ai-count" style="font-size:0.65rem">${s.district}</span>
+              <span class="ai-count">${s.district}</span>
             </li>`).join("")}
         </ul>` : ""}
       </div>
@@ -1005,9 +680,7 @@ function agencyCardCollapsed(ctx) {
     <div class="card collapsed-strip">
       <div class="card-header" onclick="SelectionService.clearSelection()">
         <div class="card-icon icon-agency">🏛️</div>
-        <div class="card-title-group">
-          <div class="card-title">${ctx.agencyName}</div>
-        </div>
+        <div class="card-title-group"><div class="card-title">${ctx.agencyName}</div></div>
         <span style="font-size:0.65rem;color:var(--fph-text-muted)">↩ home</span>
       </div>
     </div>`;
@@ -1049,18 +722,9 @@ function relatedAssetsList(station) {
       </div>
       <div class="card-body">
         <ul class="asset-list">
-          <li class="asset-item">
-            <span class="ai-name">Hydrant buffers</span>
-            <span class="ai-count">—</span>
-          </li>
-          <li class="asset-item" style="opacity:0.55">
-            <span class="ai-name">Drive-mile polygons</span>
-            <span class="ai-count">—</span>
-          </li>
-          <li class="asset-item" style="opacity:0.35">
-            <span class="ai-name">Apparatus / CP feed</span>
-            <span class="ai-count" style="color:#a78bfa">v2 scope</span>
-          </li>
+          <li class="asset-item"><span class="ai-name">Hydrant buffers</span><span class="ai-count">—</span></li>
+          <li class="asset-item" style="opacity:0.55"><span class="ai-name">Drive-mile polygons</span><span class="ai-count">—</span></li>
+          <li class="asset-item" style="opacity:0.35"><span class="ai-name">Apparatus / CP feed</span><span class="ai-count" style="color:#7c3aed">v2 scope</span></li>
         </ul>
         <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.6rem">
           Hydrant buffers: display-only — no stable key (regenerated monthly)
@@ -1073,21 +737,18 @@ function relatedAssetsList(station) {
 // DEV LOG
 // ─────────────────────────────────────────────────────────────────────────────
 function log(msg, type = "") {
-  const el = document.getElementById("log-body");
-  const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
+  const el  = document.getElementById("log-body");
+  const ts  = new Date().toLocaleTimeString("en-US", { hour12: false });
   const div = document.createElement("div");
-  div.className = `log-entry ${type}`;
+  div.className   = `log-entry ${type}`;
   div.textContent = `${ts}  ${msg}`;
   el.prepend(div);
 }
-
 window.toggleLog = function() {
-  const body = document.getElementById("log-body");
-  body.style.display = body.style.display === "none" ? "" : "none";
+  const b = document.getElementById("log-body");
+  b.style.display = b.style.display === "none" ? "" : "none";
 };
-window.clearLog = function() {
-  document.getElementById("log-body").innerHTML = "";
-};
+window.clearLog = function() { document.getElementById("log-body").innerHTML = ""; };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SUBSCRIPTIONS
@@ -1096,10 +757,9 @@ $breadcrumb.subscribe(renderRibbon);
 $mode.subscribe(renderCardStack);
 $agencyContext.subscribe(renderCardStack);
 $agencySnapshot.subscribe(renderCardStack);
-$panelState.subscribe(() => { renderRailButtons(); renderLeftPanel(); });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BOOT — wire JSAPI via AMD require
+// BOOT
 // ─────────────────────────────────────────────────────────────────────────────
 renderRibbon();
 renderCardStack();
@@ -1108,63 +768,93 @@ require([
   "esri/identity/OAuthInfo",
   "esri/identity/IdentityManager",
   "esri/layers/FeatureLayer",
+  "esri/layers/GraphicsLayer",
+  "esri/Graphic",
   "esri/Map",
   "esri/views/MapView",
-], function(OAuthInfo, esriId, FeatureLayer, Map, MapView) {
+  "esri/layers/support/LabelClass",
+  "esri/geometry/operators/unionOperator",
+], function(OAuthInfo, esriId, FeatureLayer, GraphicsLayer, Graphic, Map, MapView, LabelClass, unionOperator) {
 
-  // expose FeatureLayer to AgencyService (defined before require)
-  window._FeatureLayer = FeatureLayer;
+  // Expose to modules defined before AMD loads
+  window._FeatureLayer  = FeatureLayer;
+  window._LabelClass    = LabelClass;
+  window._unionOperator = unionOperator;
 
-  // ── OAuth ─────────────────────────────────────────────────────────
-  const oauthInfo = new OAuthInfo({
-    appId: AGOL_CLIENT_ID,
-    portalUrl: AGOL_PORTAL,
-    popup: false,
-  });
+  // ── OAuth ──────────────────────────────────────────────────────────
+  const oauthInfo = new OAuthInfo({ appId: AGOL_CLIENT_ID, portalUrl: AGOL_PORTAL, popup: false });
   esriId.registerOAuthInfos([oauthInfo]);
 
-  // ── Layers (1=2 until login resolves — prevents statewide flash) ──
+  // ── Agency boundary GraphicsLayer (Option B — thick outer outline, no second hosted layer)
+  const agencyBoundaryLayer = new GraphicsLayer({
+    title: "Agency Boundary",
+    listMode: "hide",   // keep out of layer list — it's a visual aid, not a data layer
+  });
+
+  // ── FPD layer — thin inner boundaries + labels ─────────────────────
   const fpdLayer = new FeatureLayer({
-    url: FPD_URL,
+    url:                  FPD_URL,
+    title:                "FPD Boundaries",
     definitionExpression: "1=2",
-    outFields: ["FPD_CODE", "fire_prote", "FPD_DESC"],
-    popupEnabled: false,
+    outFields:            ["FPD_CODE", "fire_prote", "fpd_desc"],
+    labelsVisible:        true,
+    renderer:             FPD_RENDERER,
+    popupEnabled:         false,
   });
 
+  // ── Primary stations ───────────────────────────────────────────────
   const stationsLayer = new FeatureLayer({
-    url: STATIONS_URL,
+    url:                  STATIONS_URL,
+    title:                "Fire Stations",
     definitionExpression: "1=2",
-    outFields: ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
-    popupEnabled: false,
+    outFields:            ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
+    labelsVisible:        true,
+    renderer:             STATION_RENDERER,
+    popupEnabled:         false,
   });
 
+  // ── Auto-aid stations — same URL, different expression, 50% opacity ─
+  const autoAidLayer = new FeatureLayer({
+    url:                  STATIONS_URL,
+    title:                "Auto Aid Stations",
+    definitionExpression: "1=2",
+    outFields:            ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
+    labelsVisible:        true,
+    opacity:              0.5,
+    renderer:             STATION_RENDERER,
+    popupEnabled:         false,
+  });
+
+  // ── Drive miles — unique-value renderer by tobreak ─────────────────
   const driveMiLayer = new FeatureLayer({
-    url: DRIVE_MILE_URL,
+    url:                  DRIVE_MILE_URL,
+    title:                "Drive Mile Coverage",
     definitionExpression: "1=2",
-    outFields: ["Station", "DIST1"],
-    popupEnabled: false,
+    outFields:            ["Station", "DIST1", "tobreak"],
+    renderer:             DRIVE_MILE_RENDERER,
+    popupEnabled:         false,
   });
 
-  // ── Map + View ────────────────────────────────────────────────────
-  const map = new Map({
-    basemap: "topo-vector",
-    layers: [fpdLayer, driveMiLayer, stationsLayer],  // FPD bottom, stations top
-  });
+  // ── Map + View ─────────────────────────────────────────────────────
+  // Layer order: agency boundary (top visual), then stations, auto-aid,
+  // FPD boundaries, drive miles (bottom). arcgis-map web component
+  // already set basemap + center in HTML.
+  const mapEl = document.getElementById("the-map");
 
-  const view = new MapView({
-    container: "the-map",
-    map,
-    center: [-120.5, 47.5],  // center of WA — replaced by queryExtent after login
-    zoom: 7,
-  });
+  mapEl.addEventListener("arcgisViewReadyChange", async () => {
+    const view = mapEl.view;
+    view.map.addMany([driveMiLayer, fpdLayer, agencyBoundaryLayer, autoAidLayer, stationsLayer]);
 
-  MapService.init(view, stationsLayer, driveMiLayer);
-  StationService.init(stationsLayer);
+    // Apply label classes now that LabelClass is loaded
+    fpdLayer.labelingInfo      = [makeFPDLabelClass(12)];
+    stationsLayer.labelingInfo = [makeLabelClass(13)];
+    autoAidLayer.labelingInfo  = [makeLabelClass(11)];
 
-  view.when(async () => {
+    MapService.init(view, stationsLayer);
+    StationService.init(stationsLayer);
+
     log("View ready", "state");
 
-    // ── Resolve identity → agency context ─────────────────────────
     try {
       const cred = await esriId.checkSignInStatus(AGOL_PORTAL + "sharing")
         .catch(() => esriId.getCredential(AGOL_PORTAL + "sharing"));
@@ -1174,20 +864,29 @@ require([
 
       const ctx = await AgencyService.resolve(portalUsername);
 
-      // Apply definitionExpression to all layers
-      fpdLayer.definitionExpression    = ctx.fpdDefExpression;
+      // Apply definition expressions
+      fpdLayer.definitionExpression      = ctx.fpdDefExpression;
       stationsLayer.definitionExpression = ctx.defExpression;
+      autoAidLayer.definitionExpression  = ctx.autoAidExpr;
       driveMiLayer.definitionExpression  = ctx.defExpression;
 
-      // Zoom to agency extent immediately — before any other async work
-      const extentResult = await stationsLayer.queryExtent({
-        where: ctx.defExpression,
-      });
-      if (extentResult.extent) {
-        await view.goTo(extentResult.extent.expand(1.5));
+      // Build agency boundary graphic (thick dark-red outline, no fill)
+      if (ctx.agencyGeometry) {
+        agencyBoundaryLayer.add(new Graphic({
+          geometry: ctx.agencyGeometry,
+          symbol: {
+            type:    "simple-fill",
+            color:   [0, 0, 0, 0],
+            outline: { color: [139, 0, 0], width: 3 },
+          },
+        }));
       }
 
-      // Set agency context atom — triggers ribbon + card stack render
+      // Zoom to agency extent
+      const extentResult = await stationsLayer.queryExtent({ where: ctx.defExpression });
+      if (extentResult.extent) await view.goTo(extentResult.extent.expand(1.5));
+
+      // Set context atom → triggers ribbon + card stack render
       $agencyContext.set(ctx);
       log(`$agencyContext set for "${ctx.agencyName}"`, "state");
 
@@ -1198,12 +897,10 @@ require([
 
       log("App ready", "state");
 
-    } catch (e) {
+    } catch(e) {
       log(`Login failed: ${e.message}`, "side");
       document.getElementById("right-panel").innerHTML =
-        `<div style="padding:1rem;font-size:0.8rem;color:var(--fph-text-muted)">
-          Login failed: ${e.message}
-        </div>`;
+        `<div style="padding:1rem;font-size:0.8rem;color:var(--fph-text-muted)">Login failed: ${e.message}</div>`;
     }
   });
 });
