@@ -544,7 +544,6 @@ const StationService = (() => {
     $agencySnapshot.set({
       stationCount:  _stations.length,
       autoAidCount:  _autoAidStations.length,
-      loadedAt: new Date().toISOString(),
     });
     log(`StationService: snapshot set (${_stations.length} primary, ${_autoAidStations.length} auto-aid, deduped)`, "state");
   }
@@ -628,10 +627,7 @@ function agencyCardExpanded(ctx, snap) {
             <div class="di-val">${snap.autoAidCount ?? "—"}</div>
             <div class="di-label">Auto Aid Stations</div>
           </div>
-        </div>
-        <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.5rem">
-          Snapshot ${new Date(snap.loadedAt).toLocaleTimeString()} — cache, not live
-        </p>` : `<p style="font-size:0.75rem;color:var(--fph-text-muted);margin-top:0.5rem">Loading data…</p>`}
+        </div>` : `<p style="font-size:0.75rem;color:var(--fph-text-muted);margin-top:0.5rem">Loading data…</p>`}
         ${stationList(stations, "Stations")}
         ${stationList(autoAid, "Auto Aid Stations")}
       </div>
