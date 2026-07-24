@@ -715,7 +715,6 @@ window.clearLog  = () => { document.getElementById("log-body").innerHTML = ""; }
 $breadcrumb.subscribe(renderRibbon);
 $mode.subscribe(renderCardStack);
 $agencyContext.subscribe(renderCardStack);
-$agencySnapshot.subscribe(renderCardStack);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BOOT
@@ -844,7 +843,7 @@ mapEl.addEventListener("arcgisViewReadyChange", async () => {
     // Load station list + snapshot
     await StationService.loadAgencyStations(ctx.defExpression, ctx.autoAidExpr);
     await StationService.loadSnapshot();
-    // $agencySnapshot subscription triggers renderCardStack automatically
+    renderCardStack();  // single render after all data is ready
 
     log("App ready", "state");
 
