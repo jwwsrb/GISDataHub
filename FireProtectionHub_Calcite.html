@@ -189,7 +189,7 @@
 
           <!-- Agency block -->
           <calcite-block id="agency-block" open collapsible>
-            <calcite-icon slot="icon" icon="organization" scale="s"></calcite-icon>
+            <span slot="icon" style="font-size:1.1rem;line-height:1">🏛️</span>
             <span slot="header-content" id="agency-block-title">Authenticating…</span>
             <calcite-label id="agency-block-subtitle" scale="s"></calcite-label>
 
@@ -322,6 +322,7 @@ const [
   unionOperator,
   esriId,
   OAuthInfo,
+  symbolUtils,
 ] = await $arcgis.import([
   "@arcgis/core/layers/FeatureLayer.js",
   "@arcgis/core/layers/GraphicsLayer.js",
@@ -330,6 +331,7 @@ const [
   "@arcgis/core/geometry/operators/unionOperator.js",
   "@arcgis/core/identity/IdentityManager.js",
   "@arcgis/core/identity/OAuthInfo.js",
+  "@arcgis/core/symbols/support/symbolUtils.js",
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -637,24 +639,57 @@ const StationService = (() => {
 // DOM HELPERS — build Calcite components programmatically
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Populate a calcite-list with station items */
-function populateStationList(listEl, stations) {
+// Pre-render symbol previews once — reused for every list item
+const STATION_SYMBOL = {
+  type: "web-style",
+  name: "fire-station",
+  styleName: "Esri2DPointSymbolsStyle",
+};
+let _stationSymbolEl    = null;  // cached rendered element
+let _stationSymbolReady = false;
+
+async function getStationSymbolEl() {
+  if (_stationSymbolReady) return _stationSymbolEl?.cloneNode(true) ?? null;
+  try {
+    const preview = await symbolUtils.renderPreviewHTML(STATION_SYMBOL, { size: 20 });
+    _stationSymbolEl   = preview;
+    _stationSymbolReady = true;
+    return preview.cloneNode(true);
+  } catch(e) {
+    log(`symbolUtils failed: ${e.message}`, "side");
+    _stationSymbolReady = true;  // don't retry
+    return null;
+  }
+}
+
+/** Populate a calcite-list with station items, rendering real map symbols */
+async function populateStationList(listEl, stations, opacity = 1) {
   listEl.innerHTML = "";
-  stations.forEach(s => {
+  for (const s of stations) {
     const item = document.createElement("calcite-list-item");
     item.setAttribute("label", s.label);
     item.setAttribute("description", s.district);
+    if (opacity < 1) item.style.opacity = String(opacity);
     item.dataset.id       = s.stationId;
     item.dataset.label    = s.label;
     item.dataset.district = s.district;
     item.dataset.address  = s.address;
+
+    // Slot in the real map symbol
+    const symEl = await getStationSymbolEl();
+    if (symEl) {
+      symEl.slot = "content-start";
+      symEl.style.flexShrink = "0";
+      item.appendChild(symEl);
+    }
+
     item.addEventListener("calciteListItemSelect", () => {
       SelectionService.selectStation(s.stationId, "list", {
         label: s.label, district: s.district, address: s.address,
       });
     });
     listEl.appendChild(item);
-  });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -680,28 +715,26 @@ function renderRibbon() {
   ribbon.innerHTML = parts + badge;
 }
 
-function renderHomeView(ctx, snap) {
-  // Agency block header
+async function renderHomeView(ctx, snap) {
   document.getElementById("agency-block-title").textContent    = ctx.agencyName;
   document.getElementById("agency-block-subtitle").textContent = ctx.portalUsername;
 
-  // Count tiles
   if (snap) {
     document.getElementById("tile-stations").setAttribute("heading", String(snap.stationCount));
     document.getElementById("tile-autoaid").setAttribute("heading",  String(snap.autoAidCount ?? "—"));
   }
 
-  // Station lists
-  populateStationList(
+  await populateStationList(
     document.getElementById("stations-list"),
-    StationService.getStations()
+    StationService.getStations(),
+    1.0
   );
-  populateStationList(
+  await populateStationList(
     document.getElementById("autoaid-list"),
-    StationService.getAutoAidStations()
+    StationService.getAutoAidStations(),
+    0.5   // matches autoAidLayer map opacity
   );
 
-  // Show/hide auto-aid block based on whether there are any
   const autoAidBlock = document.getElementById("autoaid-block");
   autoAidBlock.hidden = StationService.getAutoAidStations().length === 0;
 }
@@ -730,7 +763,7 @@ function renderStationView(sel) {
   document.getElementById("related-block").setAttribute("description", `for ${sel.label || sel.stationId}`);
 }
 
-function renderCardStack() {
+async function renderCardStack() {
   const ctx  = $agencyContext.get();
   const snap = $agencySnapshot.get();
   const sel  = $selection.get();
@@ -744,7 +777,7 @@ function renderCardStack() {
   if (mode === "home") {
     homeView.hidden    = false;
     stationView.hidden = true;
-    renderHomeView(ctx, snap);
+    await renderHomeView(ctx, snap);
   } else {
     homeView.hidden    = true;
     stationView.hidden = false;
