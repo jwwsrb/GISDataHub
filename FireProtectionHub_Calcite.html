@@ -103,6 +103,8 @@
     /* ── Calcite shell panel overrides ───────────────────────────── */
     #right-shell-panel {
       --calcite-shell-panel-width: 340px;
+      display: flex;
+      flex-direction: column;
     }
 
     /* ── Calcite block styling ───────────────────────────────────── */
@@ -131,11 +133,10 @@
 
     /* ── Dev Log ─────────────────────────────────────────────────── */
     #log-panel {
-      position: fixed; bottom: 0; right: 340px; width: 380px;
       background: var(--calcite-color-foreground-1, #f8f8f8);
-      border: 1px solid var(--calcite-color-border-3, #ddd); border-bottom: none;
-      border-radius: 8px 8px 0 0; font-family: "Fira Code", monospace;
-      font-size: 0.68rem; z-index: 9999; overflow: hidden;
+      font-family: "Fira Code", monospace;
+      font-size: 0.68rem;
+      overflow: hidden;
     }
     #log-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -191,23 +192,22 @@
           <calcite-block id="agency-block" open collapsible>
             <span slot="icon" style="font-size:1.1rem;line-height:1">🏛️</span>
             <span slot="header-content" id="agency-block-title">Authenticating…</span>
-            <calcite-label id="agency-block-subtitle" scale="s"></calcite-label>
 
-            <!-- Count tiles -->
+            <!-- Count tiles — symbols injected via JS -->
             <div id="tile-grid">
               <calcite-tile
                 id="tile-stations"
                 heading="—"
                 description="Agency Stations"
-                icon="pin-tear"
                 scale="s">
+                <div slot="content-start" id="tile-stations-icon" style="display:flex;align-items:center;justify-content:center;margin-bottom:0.25rem"></div>
               </calcite-tile>
               <calcite-tile
                 id="tile-autoaid"
                 heading="—"
                 description="Auto Aid Stations"
-                icon="pin-tear-f"
                 scale="s">
+                <div slot="content-start" id="tile-autoaid-icon" style="display:flex;align-items:center;justify-content:center;margin-bottom:0.25rem;opacity:0.5"></div>
               </calcite-tile>
             </div>
 
@@ -222,6 +222,9 @@
               <calcite-list id="autoaid-list" selection-mode="single" selection-appearance="border">
               </calcite-list>
             </calcite-block>
+
+            <!-- Username footer -->
+            <div id="agency-username" style="padding:0.5rem 0.75rem;font-size:0.7rem;color:var(--calcite-color-text-3);border-top:1px solid var(--calcite-color-border-3);margin-top:0.25rem"></div>
 
           </calcite-block>
         </div>
@@ -266,12 +269,11 @@
           <calcite-block id="related-block" open collapsible heading="Related Assets">
             <calcite-icon slot="icon" icon="layers" scale="s"></calcite-icon>
             <calcite-list>
-              <calcite-list-item label="Hydrant buffers" description="Display only — no stable key" non-interactive>
-                <calcite-icon slot="content-end" icon="information" scale="s"></calcite-icon>
+              <calcite-list-item label="Hydrant buffers" description="Contextual layer" non-interactive>
               </calcite-list-item>
-              <calcite-list-item label="Drive-mile polygons" description="Display only" non-interactive style="opacity:0.6">
+              <calcite-list-item label="Drive-mile polygons" description="Contextual layer" non-interactive style="opacity:0.6">
               </calcite-list-item>
-              <calcite-list-item label="Apparatus / CP feed" description="v2 scope" non-interactive style="opacity:0.4">
+              <calcite-list-item label="Apparatus / CP feed" description="Planned" non-interactive style="opacity:0.4">
               </calcite-list-item>
             </calcite-list>
             <!-- Future reference: hydrant buffers have no stable key (regenerated monthly)
@@ -282,19 +284,22 @@
           </calcite-block>
 
         </div>
+
+        <!-- Action Log — bottom of right panel -->
+        <div id="log-panel" style="border-top:1px solid var(--calcite-color-border-3);flex-shrink:0">
+          <div id="log-header" onclick="toggleLog()">
+            <span class="log-title">Action Log</span>
+            <span class="clear-log" onclick="event.stopPropagation(); clearLog()">clear</span>
+          </div>
+          <div id="log-body"></div>
+        </div>
+
       </calcite-shell-panel>
 
     </div>
   </div>
 
-  <!-- Dev Log -->
-  <div id="log-panel">
-    <div id="log-header" onclick="toggleLog()">
-      <span class="log-title">Action Log</span>
-      <span class="clear-log" onclick="event.stopPropagation(); clearLog()">clear</span>
-    </div>
-    <div id="log-body"></div>
-  </div>
+
 
 <script type="module">
 const { atom, computed } = window.nanostores;
@@ -719,12 +724,23 @@ function renderRibbon() {
 }
 
 async function renderHomeView(ctx, snap) {
-  document.getElementById("agency-block-title").textContent    = ctx.agencyName;
-  document.getElementById("agency-block-subtitle").textContent = ctx.portalUsername;
+  document.getElementById("agency-block-title").textContent = ctx.agencyName;
+  document.getElementById("agency-username").textContent    = ctx.portalUsername;
 
   if (snap) {
     document.getElementById("tile-stations").setAttribute("heading", String(snap.stationCount));
     document.getElementById("tile-autoaid").setAttribute("heading",  String(snap.autoAidCount ?? "—"));
+  }
+
+  // Inject real fire-station symbol into tiles
+  const symEl = await getStationSymbolEl();
+  if (symEl) {
+    const stationsIcon = document.getElementById("tile-stations-icon");
+    const autoaidIcon  = document.getElementById("tile-autoaid-icon");
+    stationsIcon.innerHTML = "";
+    autoaidIcon.innerHTML  = "";
+    stationsIcon.appendChild(symEl.cloneNode(true));
+    autoaidIcon.appendChild(symEl.cloneNode(true));
   }
 
   await populateStationList(
@@ -735,7 +751,7 @@ async function renderHomeView(ctx, snap) {
   await populateStationList(
     document.getElementById("autoaid-list"),
     StationService.getAutoAidStations(),
-    0.5   // matches autoAidLayer map opacity
+    0.5
   );
 
   const autoAidBlock = document.getElementById("autoaid-block");
