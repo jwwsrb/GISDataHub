@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en" class="calcite-mode-dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FireProtectionHub v2 — Dark</title>
+
+  <!-- ArcGIS Maps SDK 5.1 — single tag loads core API, map components, and Calcite -->
+  <script type="module" src="https://js.arcgis.com/5.1/"></script>
+
+  <!-- nanostores — plain script (executes before module scripts, intentional) -->
+  <script>
+  (function(global) {
+    function atom(initial) {
+      let value = initial;
+      const listeners = [];
+      const store = {
+        get() { return value; },
+        set(next) { value = next; listeners.forEach(fn => fn(value)); },
+        subscribe(fn) {
+          listeners.push(fn); fn(value);
+          return () => { const i = listeners.indexOf(fn); if (i > -1) listeners.splice(i, 1); };
+        }
+      };
+      return store;
+    }
+    function computed(deps, fn) {
+      const sources = Array.isArray(deps) ? deps : [deps];
+      let value = fn(...sources.map(s => s.get()));
+      const listeners = [];
+      const recompute = () => { value = fn(...sources.map(s => s.get())); listeners.forEach(f => f(value)); };
+      sources.forEach(s => s.subscribe(() => recompute()));
+      return {
+        get() { return value; },
+        subscribe(fn) {
+          listeners.push(fn); fn(value);
+          return () => { const i = listeners.indexOf(fn); if (i > -1) listeners.splice(i, 1); };
+        }
+      };
+    }
+    global.nanostores = { atom, computed };
+  })(window);
+  </script>
+
+  <style>
+    :root {
+      --fph-ribbon-h: 2.5rem;
+      --fph-accent:   #8b0000;
+      --fph-text-muted: #6b6b6b;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: var(--calcite-font-family, "Avenir Next", "Avenir", sans-serif);
+    }
+
+    /* ── Context Ribbon ──────────────────────────────────────────── */
+    #ribbon {
+      height: var(--fph-ribbon-h);
+      background: var(--calcite-color-foreground-1, #fff);
+      border-bottom: 1px solid var(--calcite-color-border-3, rgba(0,0,0,0.12));
+      display: flex;
+      align-items: center;
+      padding: 0 1rem;
+      flex-shrink: 0;
+      font-size: 0.78rem;
+      font-family: var(--calcite-font-family, "Avenir Next", sans-serif);
+    }
+    .ribbon-crumb { display: flex; align-items: center; gap: 0.4rem; }
+    .ribbon-crumb button {
+      background: none; border: none; cursor: pointer;
+      color: var(--calcite-color-text-3, #6b6b6b); font-size: 0.78rem;
+      padding: 0.2rem 0.35rem; border-radius: 4px;
+      font-family: inherit;
+      transition: color 0.15s, background 0.15s;
+    }
+    .ribbon-crumb button:hover  {
+      color: var(--calcite-color-text-1, #1a1a1a);
+      background: var(--calcite-color-foreground-2, #f0f0f0);
+    }
+    .ribbon-crumb button.active { color: var(--calcite-color-text-1, #1a1a1a); font-weight: 600; }
+    .ribbon-crumb button:disabled { cursor: default; }
+    .ribbon-sep { margin: 0 0.25rem; color: var(--calcite-color-border-3, #ccc); user-select: none; }
+    .mode-badge {
+      font-size: 0.62rem; padding: 0.1rem 0.45rem; border-radius: 10px;
+      font-weight: 600; margin-left: auto;
+      background: rgba(139,0,0,0.1); color: var(--fph-accent);
+    }
+    .mode-badge.home { background: rgba(16,185,129,0.1); color: #059669; }
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    #app-shell {
+      display: flex;
+      flex-direction: column;
+      height: calc(100% - var(--fph-ribbon-h));
+    }
+    #shell-body { display: flex; flex: 1; overflow: hidden; }
+    #map-area { flex: 1; position: relative; overflow: hidden; }
+    arcgis-map { width: 100%; height: 100%; }
+
+    /* ── Calcite shell panel overrides ───────────────────────────── */
+    #right-shell-panel {
+      --calcite-shell-panel-width: 340px;
+    }
+
+    /* ── Calcite block styling ───────────────────────────────────── */
+    calcite-block {
+      margin: 0;
+    }
+
+    /* ── Calcite tile grid ───────────────────────────────────────── */
+    #tile-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+    }
+
+    calcite-tile {
+      --calcite-tile-background-color: var(--calcite-color-foreground-2, #f0f0f0);
+    }
+
+    /* Station address block */
+    #station-address-block {
+      padding: 0.5rem 0;
+      font-size: 0.78rem;
+      color: var(--calcite-color-text-1, #1a1a1a);
+    }
+
+    /* ── Dev Log ─────────────────────────────────────────────────── */
+    #log-panel {
+      position: fixed; bottom: 0; right: 340px; width: 380px;
+      background: var(--calcite-color-foreground-1, #f8f8f8);
+      border: 1px solid var(--calcite-color-border-3, #ddd); border-bottom: none;
+      border-radius: 8px 8px 0 0; font-family: "Fira Code", monospace;
+      font-size: 0.68rem; z-index: 9999; overflow: hidden;
+    }
+    #log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.35rem 0.75rem;
+      background: var(--calcite-color-foreground-2, #f0f0f0);
+      cursor: pointer; user-select: none; font-size: 0.7rem;
+      color: var(--calcite-color-text-3, #6b6b6b);
+    }
+    #log-header .log-title { font-weight: 600; color: var(--calcite-color-text-1, #1a1a1a); }
+    #log-body { height: 140px; overflow-y: auto; padding: 0.5rem 0.75rem; display: flex; flex-direction: column-reverse; }
+    .log-entry        { padding: 0.15rem 0; color: #1a6b3a; line-height: 1.4; }
+    .log-entry.action { color: #1a56b8; }
+    .log-entry.state  { color: #7a5c00; }
+    .log-entry.side   { color: #6b3a9e; }
+    .clear-log { font-size: 0.65rem; cursor: pointer; }
+    .clear-log:hover { color: var(--calcite-color-text-1, #1a1a1a); }
+  </style>
+</head>
+<body>
+
+  <!-- Context Ribbon -->
+  <div id="ribbon"></div>
+
+  <div id="app-shell">
+    <div id="shell-body">
+
+      <!-- Map Area -->
+      <main id="map-area">
+        <arcgis-map id="the-map" basemap="dark-gray-vector" center="-120.5,47.5" zoom="7">
+          <arcgis-home             slot="top-left"></arcgis-home>
+          <arcgis-expand slot="top-left" expand-icon="basemap" expand-tooltip="Basemaps" auto-collapse>
+            <arcgis-basemap-gallery></arcgis-basemap-gallery>
+          </arcgis-expand>
+          <arcgis-expand slot="top-left" expand-icon="layers" expand-tooltip="Layers">
+            <arcgis-layer-list></arcgis-layer-list>
+          </arcgis-expand>
+          <arcgis-expand slot="top-left" expand-icon="legend" expand-tooltip="Legend" auto-collapse>
+            <arcgis-legend></arcgis-legend>
+          </arcgis-expand>
+          <arcgis-zoom             slot="top-left"></arcgis-zoom>
+          <arcgis-search           slot="top-right"></arcgis-search>
+          <arcgis-scale-bar        slot="bottom-left" unit="dual"></arcgis-scale-bar>
+        </arcgis-map>
+      </main>
+
+      <!-- Right Panel — Calcite shell panel with declarative block structure -->
+      <calcite-shell-panel id="right-shell-panel" slot="panel-end" position="end" display-mode="float-content">
+
+        <!-- ── HOME VIEW ─────────────────────────────────────────── -->
+        <div id="home-view">
+
+          <!-- Agency block -->
+          <calcite-block id="agency-block" open collapsible>
+            <calcite-icon slot="icon" icon="organization" scale="s"></calcite-icon>
+            <span slot="header-content" id="agency-block-title">Authenticating…</span>
+            <calcite-label id="agency-block-subtitle" scale="s"></calcite-label>
+
+            <!-- Count tiles -->
+            <div id="tile-grid">
+              <calcite-tile
+                id="tile-stations"
+                heading="—"
+                description="Agency Stations"
+                icon="pin-tear"
+                scale="s">
+              </calcite-tile>
+              <calcite-tile
+                id="tile-autoaid"
+                heading="—"
+                description="Auto Aid Stations"
+                icon="pin-tear-f"
+                scale="s">
+              </calcite-tile>
+            </div>
+
+            <!-- Primary station list -->
+            <calcite-block id="stations-block" open collapsible heading="Stations" scale="s" style="margin-top:0.5rem">
+              <calcite-list id="stations-list" selection-mode="single" selection-appearance="border">
+              </calcite-list>
+            </calcite-block>
+
+            <!-- Auto-aid station list -->
+            <calcite-block id="autoaid-block" open collapsible heading="Auto Aid Stations" scale="s">
+              <calcite-list id="autoaid-list" selection-mode="single" selection-appearance="border">
+              </calcite-list>
+            </calcite-block>
+
+          </calcite-block>
+        </div>
+
+        <!-- ── STATION VIEW ──────────────────────────────────────── -->
+        <div id="station-view" hidden>
+
+          <!-- Agency header — collapsed, acts as back button -->
+          <calcite-block id="agency-collapsed-block" collapsible>
+            <calcite-icon slot="icon" icon="organization" scale="s"></calcite-icon>
+            <span slot="header-content" id="agency-collapsed-title"></span>
+            <calcite-action
+              slot="header-actions-end"
+              icon="chevron-left"
+              text="Back to agency"
+              id="back-to-agency-btn"
+              scale="s">
+            </calcite-action>
+          </calcite-block>
+
+          <!-- Station block -->
+          <calcite-block id="station-block" open collapsible>
+            <calcite-icon slot="icon" icon="urban" scale="s"></calcite-icon>
+            <span slot="header-content" id="station-block-title"></span>
+            <calcite-label id="station-block-subtitle" scale="s"></calcite-label>
+
+            <div id="station-address-block" style="display:none">
+              <calcite-label scale="s">
+                <strong>Address</strong>
+                <span id="station-address-text"></span>
+              </calcite-label>
+            </div>
+
+            <calcite-notice id="station-future-notice" open icon="information" scale="s" kind="info" style="margin-top:0.5rem">
+              <div slot="message">Detail queries (hydrants, drive miles, apparatus) — future task</div>
+            </calcite-notice>
+          </calcite-block>
+
+          <!-- Related assets block -->
+          <calcite-block id="related-block" open collapsible heading="Related Assets">
+            <calcite-icon slot="icon" icon="layers" scale="s"></calcite-icon>
+            <calcite-list>
+              <calcite-list-item label="Hydrant buffers" description="Display only — no stable key" non-interactive>
+                <calcite-icon slot="content-end" icon="information" scale="s"></calcite-icon>
+              </calcite-list-item>
+              <calcite-list-item label="Drive-mile polygons" description="Display only" non-interactive style="opacity:0.6">
+              </calcite-list-item>
+              <calcite-list-item label="Apparatus / CP feed" description="v2 scope" non-interactive style="opacity:0.4">
+              </calcite-list-item>
+            </calcite-list>
+            <calcite-notice open icon="information" scale="s" kind="warning" style="margin-top:0.5rem">
+              <div slot="message">Hydrant buffers regenerated monthly — no stable key available</div>
+            </calcite-notice>
+          </calcite-block>
+
+        </div>
+      </calcite-shell-panel>
+
+    </div>
+  </div>
+
+  <!-- Dev Log -->
+  <div id="log-panel">
+    <div id="log-header" onclick="toggleLog()">
+      <span class="log-title">Action Log</span>
+      <span class="clear-log" onclick="event.stopPropagation(); clearLog()">clear</span>
+    </div>
+    <div id="log-body"></div>
+  </div>
+
+<script type="module">
+const { atom, computed } = window.nanostores;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────────────────────────────────
+const AGOL_CLIENT_ID    = "tS3sgaCh7cedVjCu";
+const AGOL_PORTAL       = "https://wsrb.maps.arcgis.com/";
+const STATIONS_URL      = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Fire_Stations/FeatureServer/0";
+const DRIVE_MILE_URL    = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Drive_Mile_Disks/FeatureServer/1";
+const FPD_URL           = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/FPD_Boundaries/FeatureServer/0";
+const USERNAMES_ITEM_ID = "a634dbad39de45ffb555381018c64892";
+const HYDRANT_BUF_URL   = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Hydrant_Buffers_1000_Feet/FeatureServer/2";
+const sqlQuote = s => `'${s.replace(/'/g, "''")}'`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IMPORTS
+// ─────────────────────────────────────────────────────────────────────────────
+const [
+  FeatureLayer,
+  GraphicsLayer,
+  Graphic,
+  LabelClass,
+  unionOperator,
+  esriId,
+  OAuthInfo,
+] = await $arcgis.import([
+  "@arcgis/core/layers/FeatureLayer.js",
+  "@arcgis/core/layers/GraphicsLayer.js",
+  "@arcgis/core/Graphic.js",
+  "@arcgis/core/layers/support/LabelClass.js",
+  "@arcgis/core/geometry/operators/unionOperator.js",
+  "@arcgis/core/identity/IdentityManager.js",
+  "@arcgis/core/identity/OAuthInfo.js",
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROPER CASE HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+const LOWERCASE_EX = new Set(["a","an","and","at","but","by","for","in","nor","of","on","or","so","the","to","up","yet"]);
+const UPPERCASE_EX = new Set(["ii","iii","iv","vi","vii","viii","ne","nw","se","sw","us","sr","wa","llc","inc","ltd","lp","llp","fpd","ems","rfa","f.p.d.","f.p.d"]);
+
+function properCase(str) {
+  if (!str) return str;
+  const words = str.toLowerCase().split(" ");
+  const result = words.map((word, i) => {
+    if (!word) return word;
+    if (UPPERCASE_EX.has(word)) return word.toUpperCase();
+    if (i > 0 && LOWERCASE_EX.has(word)) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  });
+  const last = result.length - 1;
+  if (result[last]) result[last] = result[last].charAt(0).toUpperCase() + result[last].slice(1);
+  return result.join(" ");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RENDERERS + LABEL CLASSES
+// ─────────────────────────────────────────────────────────────────────────────
+const FPD_RENDERER = {
+  type:   "simple",
+  symbol: { type: "simple-fill", color: [139, 0, 0, 0.06], outline: { color: [139, 0, 0], width: 1.5 } },
+};
+
+const makeFPDLabelClass = (size = 10) => new LabelClass({
+  labelExpressionInfo: { expression: `$feature.fpd_desc` },
+  symbol: {
+    type: "text", color: [168, 0, 0, 199], haloColor: [252, 250, 250], haloSize: 2,
+    font: { family: "Avenir Next LT Pro", weight: "bold", size },
+  },
+  labelPlacement: "always-horizontal",
+});
+
+const DRIVE_MILE_RENDERER = {
+  type: "unique-value",
+  field: "tobreak",
+  uniqueValueInfos: [
+    { value: 1.5, label: "1.5 mi", symbol: { type: "simple-fill", color: [237, 81,  81  ], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 2.5, label: "2.5 mi", symbol: { type: "simple-fill", color: [20,  158, 206 ], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 5,   label: "5 mi",   symbol: { type: "simple-fill", color: [148, 103, 189 ], outline: { color: [255,255,255], width: 0.5 } } },
+    { value: 7,   label: "7 mi",   symbol: { type: "simple-fill", color: [240, 150, 50  ], outline: { color: [255,255,255], width: 0.5 } } },
+  ],
+};
+
+const STATION_RENDERER = {
+  type:   "simple",
+  symbol: { type: "web-style", name: "fire-station", styleName: "Esri2DPointSymbolsStyle" },
+};
+
+const makeStationLabelClass = (size = 11) => new LabelClass({
+  labelExpressionInfo: { expression: `$feature["StationName"]` },
+  symbol: {
+    type: "text", color: [60, 60, 60], haloColor: [255, 255, 255], haloSize: 1.5,
+    font: { family: "Avenir Next LT Pro", style: "normal", weight: "bold", size },
+    xoffset: -8, yoffset: 11,
+  },
+  labelPlacement: "center-right",
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OAUTH
+// ─────────────────────────────────────────────────────────────────────────────
+const oauthInfo = new OAuthInfo({ appId: AGOL_CLIENT_ID, portalUrl: AGOL_PORTAL, popup: false });
+esriId.registerOAuthInfos([oauthInfo]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SOURCE ATOMS
+// ─────────────────────────────────────────────────────────────────────────────
+const $selection      = atom({ stationId: null, label: "", district: "", address: "" });
+const $agencyContext  = atom(null);
+const $agencySnapshot = atom(null);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPUTED STORES
+// ─────────────────────────────────────────────────────────────────────────────
+const $mode = computed($selection, sel => sel.stationId === null ? "home" : "station");
+
+const $breadcrumb = computed([$agencyContext, $selection], (ctx, sel) => {
+  if (!ctx) return [];
+  const crumbs = [{ label: ctx.agencyName, action: sel.stationId ? () => SelectionService.clearSelection() : null }];
+  if (sel.stationId) crumbs.push({ label: sel.label || sel.stationId, action: null });
+  return crumbs;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AGENCY SERVICE
+// ─────────────────────────────────────────────────────────────────────────────
+async function resolveAgency(portalUsername) {
+  log(`AgencyService: resolving "${portalUsername}"`, "state");
+
+  const usernamesTable = new FeatureLayer({ portalItem: { id: USERNAMES_ITEM_ID } });
+  const userResult = await usernamesTable.queryFeatures({
+    where: `portal_user = '${portalUsername}'`,
+    outFields: ["portal_user", "fire_prote"], returnGeometry: false,
+  });
+  if (!userResult.features.length) throw new Error(`No agency found for portal user "${portalUsername}"`);
+
+  const fire_prote = userResult.features[0].attributes["fire_prote"];
+  log(`AgencyService: fire_prote = "${fire_prote}"`, "state");
+
+  const fpdQueryLayer = new FeatureLayer({ url: FPD_URL });
+  const fpdResult = await fpdQueryLayer.queryFeatures({
+    where: `fire_prote = ${sqlQuote(fire_prote)}`,
+    outFields: ["FPD_CODE"], returnGeometry: true,
+    outSpatialReference: { wkid: 102100 },
+  });
+  if (!fpdResult.features.length) throw new Error(`No FPD_CODEs found for agency "${fire_prote}"`);
+
+  const fpdCodes = fpdResult.features.map(f => f.attributes["FPD_CODE"]);
+  log(`AgencyService: FPD_CODEs = [${fpdCodes.join(", ")}]`, "state");
+
+  let agencyGeometry = null;
+  try {
+    const geometries = fpdResult.features.map(f => f.geometry);
+    agencyGeometry = geometries.length === 1
+      ? geometries[0]
+      : unionOperator.executeMany(geometries);
+    log(`AgencyService: agency boundary computed`, "state");
+  } catch(e) {
+    log(`AgencyService: geometry union failed — ${e.message}`, "side");
+  }
+
+  const inList           = fpdCodes.map(c => `'${c}'`).join(", ");
+  const defExpression    = `DIST1 IN (${inList}) AND STNTYPE = 'A'`;
+  const fpdDefExpression = `fire_prote = ${sqlQuote(fire_prote)}`;
+  const distClause       = fpdCodes.length === 1 ? `= '${fpdCodes[0]}'` : `IN (${inList})`;
+  const autoAidExpr      = `(${
+    Array.from({ length: 23 }, (_, i) => `DIST${i + 2} ${distClause}`).join(" OR ")
+  }) AND DIST1 NOT IN (${inList}) AND STNTYPE = 'A'`;
+
+  log(`AgencyService: defExpression = "${defExpression}"`, "state");
+
+  return {
+    agencyName: properCase(fire_prote),
+    fire_prote, portalUsername, fpdCodes,
+    defExpression, fpdDefExpression, autoAidExpr, agencyGeometry,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAP SERVICE
+// ─────────────────────────────────────────────────────────────────────────────
+const MapService = (() => {
+  let _view = null, _stationsLayer = null, _highlight = null;
+
+  function init(view, stationsLayer) {
+    _view = view; _stationsLayer = stationsLayer;
+
+    _view.on("click", async (event) => {
+      const hitResult = await _view.hitTest(event, { include: [_stationsLayer], tolerance: 6 });
+      const stationHit = hitResult.results.find(r => r.layer === _stationsLayer);
+      if (!stationHit) {
+        if (!hitResult.results.length) SelectionService.clearSelection();
+        return;
+      }
+      const oidField = _stationsLayer.objectIdField || "OBJECTID";
+      const oid      = stationHit.graphic.attributes[oidField];
+      try {
+        const result = await _stationsLayer.queryFeatures({
+          objectIds: [oid],
+          outFields: ["Station", "StationName", "FIRE_DISTRICT", "StationAddress"],
+          returnGeometry: false,
+        });
+        const attrs     = result.features[0]?.attributes;
+        const stationId = attrs?.["Station"];
+        log(`hit: Station="${stationId}"`, "action");
+        SelectionService.selectStation(stationId, "map", {
+          label:    attrs?.["StationName"] || stationId,
+          district: attrs?.["FIRE_DISTRICT"] || "",
+          address:  attrs?.["StationAddress"] || "",
+        });
+      } catch(e) { log(`hit: query failed: ${e.message}`, "side"); }
+    });
+
+    log("MapService ready", "state");
+  }
+
+  async function goToStation(stationId) {
+    if (!_view || !_stationsLayer) return;
+    try {
+      const r = await _stationsLayer.queryFeatures({
+        where: `Station = '${stationId}'`, returnGeometry: true, outFields: ["Station"],
+      });
+      if (r.features.length) await _view.goTo({ target: r.features[0].geometry, zoom: 14 });
+    } catch(e) { log(`goTo failed: ${e.message}`, "side"); }
+  }
+
+  async function highlightStation(stationId) {
+    if (!_view || !_stationsLayer) return;
+    clearHighlight();
+    try {
+      const lv = await _view.whenLayerView(_stationsLayer);
+      const r  = await _stationsLayer.queryFeatures({
+        where: `Station = '${stationId}'`, returnGeometry: false, outFields: ["OBJECTID"],
+      });
+      if (r.features.length) _highlight = lv.highlight(r.features);
+    } catch(e) { log(`highlight failed: ${e.message}`, "side"); }
+  }
+
+  function clearHighlight() { if (_highlight) { _highlight.remove(); _highlight = null; } }
+  return { init, goToStation, highlightStation, clearHighlight };
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SELECTION SERVICE
+// ─────────────────────────────────────────────────────────────────────────────
+const SelectionService = {
+  selectStation(stationId, source = "map", display = {}) {
+    log(`selectStation("${stationId}", source="${source}")`, "action");
+    $selection.set({
+      stationId,
+      label:    display.label    || stationId,
+      district: display.district || "",
+      address:  display.address  || "",
+    });
+    MapService.highlightStation(stationId);
+    if (source === "search" || source === "list") MapService.goToStation(stationId);
+  },
+  clearSelection() {
+    log("clearSelection()", "action");
+    $selection.set({ stationId: null, label: "", district: "", address: "" });
+    MapService.clearHighlight();
+  },
+};
+window.SelectionService = SelectionService;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATION SERVICE
+// ─────────────────────────────────────────────────────────────────────────────
+const StationService = (() => {
+  let _layer = null, _autoAidLayer = null;
+  let _stations = [], _autoAidStations = [];
+
+  function init(layer, autoAidLayer) { _layer = layer; _autoAidLayer = autoAidLayer; }
+
+  async function loadAgencyStations(expr, autoAidExpr) {
+    try {
+      const r = await _layer.queryFeatures({
+        where: expr || "1=1",
+        outFields: ["Station","StationName","FIRE_DISTRICT","StationAddress"],
+        returnGeometry: false,
+      });
+      const seen = new Set();
+      _stations = r.features
+        .map(f => ({
+          stationId: String(f.attributes["Station"]).trim(),
+          label:     f.attributes["StationName"] || String(f.attributes["Station"]),
+          district:  f.attributes["FIRE_DISTRICT"] || "",
+          address:   f.attributes["StationAddress"] || "",
+        }))
+        .filter(s => { if (seen.has(s.stationId)) return false; seen.add(s.stationId); return true; });
+      log(`StationService: ${_stations.length} primary stations loaded`, "state");
+    } catch(e) { log(`StationService primary failed: ${e.message}`, "side"); }
+
+    try {
+      const r = await _autoAidLayer.queryFeatures({
+        where: autoAidExpr || "1=1",
+        outFields: ["Station","StationName","FIRE_DISTRICT","StationAddress"],
+        returnGeometry: false,
+      });
+      const seen2 = new Set();
+      _autoAidStations = r.features
+        .map(f => ({
+          stationId: String(f.attributes["Station"]).trim(),
+          label:     f.attributes["StationName"] || String(f.attributes["Station"]),
+          district:  f.attributes["FIRE_DISTRICT"] || "",
+          address:   f.attributes["StationAddress"] || "",
+        }))
+        .filter(s => { if (seen2.has(s.stationId)) return false; seen2.add(s.stationId); return true; });
+      log(`StationService: ${_autoAidStations.length} auto-aid stations loaded`, "state");
+    } catch(e) { log(`StationService auto-aid failed: ${e.message}`, "side"); }
+  }
+
+  function loadSnapshot() {
+    $agencySnapshot.set({
+      stationCount: _stations.length,
+      autoAidCount: _autoAidStations.length,
+    });
+    log(`StationService: snapshot set (${_stations.length} primary, ${_autoAidStations.length} auto-aid)`, "state");
+  }
+
+  function getStations()        { return _stations; }
+  function getAutoAidStations() { return _autoAidStations; }
+  return { init, loadAgencyStations, loadSnapshot, getStations, getAutoAidStations };
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOM HELPERS — build Calcite components programmatically
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Populate a calcite-list with station items */
+function populateStationList(listEl, stations) {
+  listEl.innerHTML = "";
+  stations.forEach(s => {
+    const item = document.createElement("calcite-list-item");
+    item.setAttribute("label", s.label);
+    item.setAttribute("description", s.district);
+    item.dataset.id       = s.stationId;
+    item.dataset.label    = s.label;
+    item.dataset.district = s.district;
+    item.dataset.address  = s.address;
+    item.addEventListener("calciteListItemSelect", () => {
+      SelectionService.selectStation(s.stationId, "list", {
+        label: s.label, district: s.district, address: s.address,
+      });
+    });
+    listEl.appendChild(item);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RENDERING — update DOM properties, never innerHTML on Calcite components
+// ─────────────────────────────────────────────────────────────────────────────
+
+function renderRibbon() {
+  const ribbon = document.getElementById("ribbon");
+  const crumbs = $breadcrumb.get();
+  const mode   = $mode.get();
+  const badge  = `<span class="mode-badge ${mode}">${mode === "home" ? "HOME" : "STATION"}</span>`;
+  if (!crumbs.length) {
+    ribbon.innerHTML = `<span style="color:var(--calcite-color-text-3);font-size:0.75rem">Authenticating…</span>${badge}`;
+    return;
+  }
+  const parts = crumbs.map((c, i) => {
+    const sep    = i > 0 ? `<span class="ribbon-sep">›</span>` : "";
+    const isLast = i === crumbs.length - 1;
+    if (isLast || !c.action)
+      return `${sep}<span class="ribbon-crumb"><button class="active" disabled>${c.label}</button></span>`;
+    return `${sep}<span class="ribbon-crumb"><button onclick="SelectionService.clearSelection()">${c.label}</button></span>`;
+  }).join("");
+  ribbon.innerHTML = parts + badge;
+}
+
+function renderHomeView(ctx, snap) {
+  // Agency block header
+  document.getElementById("agency-block-title").textContent    = ctx.agencyName;
+  document.getElementById("agency-block-subtitle").textContent = ctx.portalUsername;
+
+  // Count tiles
+  if (snap) {
+    document.getElementById("tile-stations").setAttribute("heading", String(snap.stationCount));
+    document.getElementById("tile-autoaid").setAttribute("heading",  String(snap.autoAidCount ?? "—"));
+  }
+
+  // Station lists
+  populateStationList(
+    document.getElementById("stations-list"),
+    StationService.getStations()
+  );
+  populateStationList(
+    document.getElementById("autoaid-list"),
+    StationService.getAutoAidStations()
+  );
+
+  // Show/hide auto-aid block based on whether there are any
+  const autoAidBlock = document.getElementById("autoaid-block");
+  autoAidBlock.hidden = StationService.getAutoAidStations().length === 0;
+}
+
+function renderStationView(sel) {
+  const agencyBlock = document.getElementById("agency-collapsed-block");
+  const ctx = $agencyContext.get();
+  if (ctx) {
+    document.getElementById("agency-collapsed-title").textContent = ctx.agencyName;
+    agencyBlock.open = false;
+  }
+
+  document.getElementById("station-block-title").textContent    = sel.label || sel.stationId;
+  document.getElementById("station-block-subtitle").textContent = sel.district || "";
+
+  const addrBlock = document.getElementById("station-address-block");
+  const addrText  = document.getElementById("station-address-text");
+  if (sel.address) {
+    addrText.textContent = properCase(sel.address);
+    addrBlock.style.display = "";
+  } else {
+    addrBlock.style.display = "none";
+  }
+
+  // Update related assets subtitle
+  document.getElementById("related-block").setAttribute("description", `for ${sel.label || sel.stationId}`);
+}
+
+function renderCardStack() {
+  const ctx  = $agencyContext.get();
+  const snap = $agencySnapshot.get();
+  const sel  = $selection.get();
+  const mode = $mode.get();
+
+  const homeView    = document.getElementById("home-view");
+  const stationView = document.getElementById("station-view");
+
+  if (!ctx) return;  // still authenticating — views stay hidden
+
+  if (mode === "home") {
+    homeView.hidden    = false;
+    stationView.hidden = true;
+    renderHomeView(ctx, snap);
+  } else {
+    homeView.hidden    = true;
+    stationView.hidden = false;
+    renderStationView(sel);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EVENT WIRING — Calcite action / button events
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById("back-to-agency-btn").addEventListener("click", () => {
+  SelectionService.clearSelection();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEV LOG
+// ─────────────────────────────────────────────────────────────────────────────
+function log(msg, type = "") {
+  const el = document.getElementById("log-body");
+  const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
+  const d  = document.createElement("div");
+  d.className = `log-entry ${type}`; d.textContent = `${ts}  ${msg}`;
+  el.prepend(d);
+}
+window.toggleLog = () => {
+  const b = document.getElementById("log-body");
+  b.style.display = b.style.display === "none" ? "" : "none";
+};
+window.clearLog = () => { document.getElementById("log-body").innerHTML = ""; };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUBSCRIPTIONS
+// ─────────────────────────────────────────────────────────────────────────────
+$breadcrumb.subscribe(renderRibbon);
+$mode.subscribe(renderCardStack);
+$agencyContext.subscribe(renderCardStack);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────────────────────────────────────
+renderRibbon();
+
+const agencyBoundaryLayer = new GraphicsLayer({ title: "Agency Boundary", listMode: "show" });
+
+const fpdLayer = new FeatureLayer({
+  url: FPD_URL, title: "FPD Boundaries",
+  definitionExpression: "1=2",
+  outFields: ["FPD_CODE", "fire_prote", "fpd_desc"],
+  labelsVisible: true, labelingInfo: [makeFPDLabelClass(10)],
+  renderer: FPD_RENDERER, popupEnabled: false,
+});
+
+const stationsLayer = new FeatureLayer({
+  url: STATIONS_URL, title: "Fire Stations",
+  definitionExpression: "1=2",
+  outFields: ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
+  labelsVisible: true, labelingInfo: [makeStationLabelClass(11)],
+  renderer: STATION_RENDERER, popupEnabled: false,
+});
+
+const autoAidLayer = new FeatureLayer({
+  url: STATIONS_URL, title: "Auto Aid Stations",
+  definitionExpression: "1=2",
+  outFields: ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
+  labelsVisible: true, labelingInfo: [makeStationLabelClass(9)],
+  opacity: 0.5, renderer: STATION_RENDERER, popupEnabled: false,
+});
+
+const hydrantBufLayer = new FeatureLayer({
+  url: HYDRANT_BUF_URL, title: "Hydrant Buffers (1000 ft)",
+  visible: false, minScale: 150000, opacity: 0.32, popupEnabled: false,
+  renderer: {
+    type: "simple",
+    symbol: { type: "simple-fill", color: [197, 225, 240], outline: { color: [0, 40, 100], width: 2 } },
+  },
+});
+
+const driveMiLayer = new FeatureLayer({
+  url: DRIVE_MILE_URL, title: "Drive Mile Coverage",
+  definitionExpression: "1=2",
+  outFields: ["Station", "DIST1", "tobreak"],
+  opacity: 0.5, renderer: DRIVE_MILE_RENDERER, popupEnabled: false,
+});
+
+const mapEl = document.getElementById("the-map");
+
+mapEl.addEventListener("arcgisViewReadyChange", async () => {
+  const view = mapEl.view;
+  view.map.addMany([hydrantBufLayer, driveMiLayer, fpdLayer, agencyBoundaryLayer, autoAidLayer, stationsLayer]);
+
+  MapService.init(view, stationsLayer);
+  StationService.init(stationsLayer, autoAidLayer);
+  log("View ready", "state");
+
+  try {
+    const cred = await esriId.checkSignInStatus(AGOL_PORTAL + "sharing")
+      .catch(() => esriId.getCredential(AGOL_PORTAL + "sharing"));
+
+    const portalUsername = cred.userId;
+    log(`OAuth: signed in as "${portalUsername}"`, "state");
+
+    const ctx = await resolveAgency(portalUsername);
+
+    fpdLayer.definitionExpression      = ctx.fpdDefExpression;
+    stationsLayer.definitionExpression = ctx.defExpression;
+    autoAidLayer.definitionExpression  = ctx.autoAidExpr;
+    driveMiLayer.definitionExpression  = ctx.defExpression;
+
+    if (ctx.agencyGeometry) {
+      hydrantBufLayer.geometryDefinition = ctx.agencyGeometry;
+      agencyBoundaryLayer.add(new Graphic({
+        geometry: ctx.agencyGeometry,
+        symbol: { type: "simple-fill", color: [0, 0, 0, 0], outline: { color: [139, 0, 0, 200], width: 2.5 } },
+      }));
+    }
+
+    const extentResult = await stationsLayer.queryExtent({ where: ctx.defExpression });
+    if (extentResult.extent) await view.goTo(extentResult.extent.expand(1.5));
+
+    await StationService.loadAgencyStations(ctx.defExpression, ctx.autoAidExpr);
+    StationService.loadSnapshot();
+
+    $agencyContext.set(ctx);
+    log(`$agencyContext set for "${ctx.agencyName}"`, "state");
+    log("App ready", "state");
+
+  } catch(e) {
+    log(`Login failed: ${e.message}`, "side");
+  }
+});
+</script>
+</body>
+</html>
