@@ -323,6 +323,7 @@ const [
   esriId,
   OAuthInfo,
   symbolUtils,
+  WebStyleSymbol,
 ] = await $arcgis.import([
   "@arcgis/core/layers/FeatureLayer.js",
   "@arcgis/core/layers/GraphicsLayer.js",
@@ -332,6 +333,7 @@ const [
   "@arcgis/core/identity/IdentityManager.js",
   "@arcgis/core/identity/OAuthInfo.js",
   "@arcgis/core/symbols/support/symbolUtils.js",
+  "@arcgis/core/symbols/WebStyleSymbol.js",
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -639,25 +641,26 @@ const StationService = (() => {
 // DOM HELPERS — build Calcite components programmatically
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Pre-render symbol previews once — reused for every list item
-const STATION_SYMBOL = {
-  type: "web-style",
-  name: "fire-station",
-  styleName: "Esri2DPointSymbolsStyle",
-};
-let _stationSymbolEl    = null;  // cached rendered element
+// Pre-render symbol preview once — reused for every list item
+let _stationSymbolEl    = null;
 let _stationSymbolReady = false;
 
 async function getStationSymbolEl() {
   if (_stationSymbolReady) return _stationSymbolEl?.cloneNode(true) ?? null;
   try {
-    const preview = await symbolUtils.renderPreviewHTML(STATION_SYMBOL, { size: 20 });
-    _stationSymbolEl   = preview;
+    // WebStyleSymbol must be resolved to a CIMSymbol/PictureMarker before renderPreviewHTML
+    const webSym = new WebStyleSymbol({
+      name:      "fire-station",
+      styleName: "Esri2DPointSymbolsStyle",
+    });
+    const resolvedSym = await webSym.fetchSymbol();
+    const preview     = await symbolUtils.renderPreviewHTML(resolvedSym, { size: 20 });
+    _stationSymbolEl    = preview;
     _stationSymbolReady = true;
     return preview.cloneNode(true);
   } catch(e) {
     log(`symbolUtils failed: ${e.message}`, "side");
-    _stationSymbolReady = true;  // don't retry
+    _stationSymbolReady = true;
     return null;
   }
 }
