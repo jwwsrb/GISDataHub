@@ -44,51 +44,45 @@
 
   <style>
     :root {
-      --fph-right-width: 340px;
       --fph-ribbon-h: 2.5rem;
-      --fph-surface:  #ffffff;
-      --fph-surface2: #f0f0f0;
-      --fph-border:   rgba(0,0,0,0.12);
       --fph-accent:   #8b0000;
-      --fph-accent2:  #1a73b8;
-      --fph-text:     #1a1a1a;
       --fph-text-muted: #6b6b6b;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      font-family: var(--calcite-font-family, "Avenir Next", "Avenir", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-      background: #f5f5f5;
-      color: var(--fph-text);
-      height: 100dvh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+    html, body {
+      height: 100%;
+      font-family: var(--calcite-font-family, "Avenir Next", "Avenir", sans-serif);
     }
 
     /* ── Context Ribbon ──────────────────────────────────────────── */
     #ribbon {
       height: var(--fph-ribbon-h);
-      background: var(--fph-surface);
-      border-bottom: 1px solid var(--fph-border);
+      background: var(--calcite-color-foreground-1, #fff);
+      border-bottom: 1px solid var(--calcite-color-border-3, rgba(0,0,0,0.12));
       display: flex;
       align-items: center;
       padding: 0 1rem;
       flex-shrink: 0;
       font-size: 0.78rem;
+      font-family: var(--calcite-font-family, "Avenir Next", sans-serif);
     }
     .ribbon-crumb { display: flex; align-items: center; gap: 0.4rem; }
     .ribbon-crumb button {
       background: none; border: none; cursor: pointer;
-      color: var(--fph-text-muted); font-size: 0.78rem;
+      color: var(--calcite-color-text-3, #6b6b6b); font-size: 0.78rem;
       padding: 0.2rem 0.35rem; border-radius: 4px;
+      font-family: inherit;
       transition: color 0.15s, background 0.15s;
     }
-    .ribbon-crumb button:hover  { color: var(--fph-text); background: var(--fph-surface2); }
-    .ribbon-crumb button.active { color: var(--fph-text); font-weight: 600; }
+    .ribbon-crumb button:hover  {
+      color: var(--calcite-color-text-1, #1a1a1a);
+      background: var(--calcite-color-foreground-2, #f0f0f0);
+    }
+    .ribbon-crumb button.active { color: var(--calcite-color-text-1, #1a1a1a); font-weight: 600; }
     .ribbon-crumb button:disabled { cursor: default; }
-    .ribbon-sep { margin: 0 0.25rem; color: var(--fph-border); user-select: none; }
+    .ribbon-sep { margin: 0 0.25rem; color: var(--calcite-color-border-3, #ccc); user-select: none; }
     .mode-badge {
       font-size: 0.62rem; padding: 0.1rem 0.45rem; border-radius: 10px;
       font-weight: 600; margin-left: auto;
@@ -96,79 +90,68 @@
     }
     .mode-badge.home { background: rgba(16,185,129,0.1); color: #059669; }
 
-    /* ── Shell body ──────────────────────────────────────────────── */
+    /* ── Layout ──────────────────────────────────────────────────── */
+    #app-shell {
+      display: flex;
+      flex-direction: column;
+      height: calc(100% - var(--fph-ribbon-h));
+    }
     #shell-body { display: flex; flex: 1; overflow: hidden; }
-
-    /* ── Map Area ────────────────────────────────────────────────── */
     #map-area { flex: 1; position: relative; overflow: hidden; }
     arcgis-map { width: 100%; height: 100%; }
 
-    /* ── Right Panel ─────────────────────────────────────────────── */
-    #right-panel {
-      width: var(--fph-right-width);
-      background: var(--fph-surface);
-      border-left: 1px solid var(--fph-border);
-      overflow-y: auto; flex-shrink: 0;
-      display: flex; flex-direction: column;
+    /* ── Calcite shell panel overrides ───────────────────────────── */
+    #right-shell-panel {
+      --calcite-shell-panel-width: 340px;
     }
 
-    /* ── Cards ───────────────────────────────────────────────────── */
-    .card { border-bottom: 1px solid var(--fph-border); }
-    .card-header {
-      display: flex; align-items: center; padding: 0.75rem 1rem; gap: 0.6rem;
-      cursor: pointer; user-select: none; transition: background 0.15s;
+    /* ── Calcite block styling ───────────────────────────────────── */
+    calcite-block {
+      margin: 0;
     }
-    .card-header:hover { background: var(--fph-surface2); }
-    .card-icon {
-      width: 2rem; height: 2rem; border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem; flex-shrink: 0;
+
+    /* ── Calcite tile grid ───────────────────────────────────────── */
+    #tile-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
     }
-    .icon-agency  { background: rgba(139,0,0,0.1);   color: #8b0000; }
-    .icon-station { background: rgba(26,115,184,0.1); color: #1a73b8; }
-    .icon-assets  { background: rgba(100,80,180,0.1); color: #6450b4; }
-    .card-title-group { flex: 1; min-width: 0; }
-    .card-title    { font-size: 0.82rem; font-weight: 600; color: var(--fph-text); }
-    .card-subtitle { font-size: 0.7rem; color: var(--fph-text-muted); margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .card-body { display: none; padding: 0 1rem 1rem; }
-    .card.expanded .card-body { display: block; }
-    .card.collapsed-strip .card-header { padding: 0.4rem 0.75rem; background: var(--fph-surface2); }
-    .card.collapsed-strip .card-title  { font-size: 0.75rem; }
-    .card.collapsed-strip .card-icon   { width: 1.5rem; height: 1.5rem; font-size: 0.8rem; }
 
-    /* ── Data grid ───────────────────────────────────────────────── */
-    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem; }
-    .data-item { background: var(--fph-surface2); border-radius: 6px; padding: 0.5rem 0.65rem; }
-    .data-item .di-val   { font-size: 1.1rem; font-weight: 700; color: var(--fph-text); line-height: 1; }
-    .data-item .di-label { font-size: 0.65rem; color: var(--fph-text-muted); margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    calcite-tile {
+      --calcite-tile-background-color: var(--calcite-color-foreground-2, #f0f0f0);
+    }
 
-    .section-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fph-text-muted); margin: 0.75rem 0 0.35rem; }
-
-    .asset-list { list-style: none; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem; }
-    .asset-item { display: flex; align-items: center; justify-content: space-between; background: var(--fph-surface2); border-radius: 6px; padding: 0.45rem 0.65rem; font-size: 0.75rem; }
-    .asset-item .ai-name  { color: var(--fph-text); }
-    .asset-item .ai-count { font-size: 0.7rem; font-weight: 600; color: var(--fph-text-muted); }
+    /* Station address block */
+    #station-address-block {
+      padding: 0.5rem 0;
+      font-size: 0.78rem;
+      color: var(--calcite-color-text-1, #1a1a1a);
+    }
 
     /* ── Dev Log ─────────────────────────────────────────────────── */
     #log-panel {
-      position: fixed; bottom: 0; right: var(--fph-right-width); width: 380px;
-      background: #f8f8f8; border: 1px solid var(--fph-border); border-bottom: none;
+      position: fixed; bottom: 0; right: 340px; width: 380px;
+      background: var(--calcite-color-foreground-1, #f8f8f8);
+      border: 1px solid var(--calcite-color-border-3, #ddd); border-bottom: none;
       border-radius: 8px 8px 0 0; font-family: "Fira Code", monospace;
       font-size: 0.68rem; z-index: 9999; overflow: hidden;
     }
     #log-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0.35rem 0.75rem; background: var(--fph-surface2);
-      cursor: pointer; user-select: none; font-size: 0.7rem; color: var(--fph-text-muted);
+      padding: 0.35rem 0.75rem;
+      background: var(--calcite-color-foreground-2, #f0f0f0);
+      cursor: pointer; user-select: none; font-size: 0.7rem;
+      color: var(--calcite-color-text-3, #6b6b6b);
     }
-    #log-header .log-title { font-weight: 600; color: var(--fph-text); }
+    #log-header .log-title { font-weight: 600; color: var(--calcite-color-text-1, #1a1a1a); }
     #log-body { height: 140px; overflow-y: auto; padding: 0.5rem 0.75rem; display: flex; flex-direction: column-reverse; }
     .log-entry        { padding: 0.15rem 0; color: #1a6b3a; line-height: 1.4; }
     .log-entry.action { color: #1a56b8; }
     .log-entry.state  { color: #7a5c00; }
     .log-entry.side   { color: #6b3a9e; }
-    .clear-log { font-size: 0.65rem; color: var(--fph-text-muted); cursor: pointer; }
-    .clear-log:hover { color: var(--fph-text); }
+    .clear-log { font-size: 0.65rem; cursor: pointer; }
+    .clear-log:hover { color: var(--calcite-color-text-1, #1a1a1a); }
   </style>
 </head>
 <body>
@@ -176,33 +159,128 @@
   <!-- Context Ribbon -->
   <div id="ribbon"></div>
 
-  <div id="shell-body">
-    <main id="map-area">
-      <arcgis-map id="the-map" basemap="topo-vector" center="-120.5,47.5" zoom="7">
+  <div id="app-shell">
+    <div id="shell-body">
 
-        <!-- Standard Portal web map widget stack, top-left -->
-        <arcgis-home             slot="top-left"></arcgis-home>
-        <arcgis-expand slot="top-left" expand-icon="basemap"  expand-tooltip="Basemaps" auto-collapse>
-          <arcgis-basemap-gallery></arcgis-basemap-gallery>
-        </arcgis-expand>
-        <arcgis-expand slot="top-left" expand-icon="layers"   expand-tooltip="Layers">
-          <arcgis-layer-list></arcgis-layer-list>
-        </arcgis-expand>
-        <arcgis-expand slot="top-left" expand-icon="legend"   expand-tooltip="Legend" auto-collapse>
-          <arcgis-legend></arcgis-legend>
-        </arcgis-expand>
-        <arcgis-zoom             slot="top-left"></arcgis-zoom>
+      <!-- Map Area -->
+      <main id="map-area">
+        <arcgis-map id="the-map" basemap="topo-vector" center="-120.5,47.5" zoom="7">
+          <arcgis-home             slot="top-left"></arcgis-home>
+          <arcgis-expand slot="top-left" expand-icon="basemap" expand-tooltip="Basemaps" auto-collapse>
+            <arcgis-basemap-gallery></arcgis-basemap-gallery>
+          </arcgis-expand>
+          <arcgis-expand slot="top-left" expand-icon="layers" expand-tooltip="Layers">
+            <arcgis-layer-list></arcgis-layer-list>
+          </arcgis-expand>
+          <arcgis-expand slot="top-left" expand-icon="legend" expand-tooltip="Legend" auto-collapse>
+            <arcgis-legend></arcgis-legend>
+          </arcgis-expand>
+          <arcgis-zoom             slot="top-left"></arcgis-zoom>
+          <arcgis-search           slot="top-right"></arcgis-search>
+          <arcgis-scale-bar        slot="bottom-left" unit="dual"></arcgis-scale-bar>
+        </arcgis-map>
+      </main>
 
-        <!-- Search top-right -->
-        <arcgis-search slot="top-right"></arcgis-search>
+      <!-- Right Panel — Calcite shell panel with declarative block structure -->
+      <calcite-shell-panel id="right-shell-panel" slot="panel-end" position="end" display-mode="float-content">
 
-        <!-- Scale bar bottom-left -->
-        <arcgis-scale-bar slot="bottom-left" unit="dual"></arcgis-scale-bar>
+        <!-- ── HOME VIEW ─────────────────────────────────────────── -->
+        <div id="home-view">
 
-      </arcgis-map>
-    </main>
+          <!-- Agency block -->
+          <calcite-block id="agency-block" open collapsible>
+            <calcite-icon slot="icon" icon="organization" scale="s"></calcite-icon>
+            <span slot="header-content" id="agency-block-title">Authenticating…</span>
+            <calcite-label id="agency-block-subtitle" scale="s"></calcite-label>
 
-    <aside id="right-panel"></aside>
+            <!-- Count tiles -->
+            <div id="tile-grid">
+              <calcite-tile
+                id="tile-stations"
+                heading="—"
+                description="Agency Stations"
+                icon="pin-tear"
+                scale="s">
+              </calcite-tile>
+              <calcite-tile
+                id="tile-autoaid"
+                heading="—"
+                description="Auto Aid Stations"
+                icon="pin-tear-f"
+                scale="s">
+              </calcite-tile>
+            </div>
+
+            <!-- Primary station list -->
+            <calcite-block id="stations-block" open collapsible heading="Stations" scale="s" style="margin-top:0.5rem">
+              <calcite-list id="stations-list" selection-mode="single" selection-appearance="border">
+              </calcite-list>
+            </calcite-block>
+
+            <!-- Auto-aid station list -->
+            <calcite-block id="autoaid-block" open collapsible heading="Auto Aid Stations" scale="s">
+              <calcite-list id="autoaid-list" selection-mode="single" selection-appearance="border">
+              </calcite-list>
+            </calcite-block>
+
+          </calcite-block>
+        </div>
+
+        <!-- ── STATION VIEW ──────────────────────────────────────── -->
+        <div id="station-view" hidden>
+
+          <!-- Agency header — collapsed, acts as back button -->
+          <calcite-block id="agency-collapsed-block" collapsible>
+            <calcite-icon slot="icon" icon="organization" scale="s"></calcite-icon>
+            <span slot="header-content" id="agency-collapsed-title"></span>
+            <calcite-action
+              slot="header-actions-end"
+              icon="chevron-left"
+              text="Back to agency"
+              id="back-to-agency-btn"
+              scale="s">
+            </calcite-action>
+          </calcite-block>
+
+          <!-- Station block -->
+          <calcite-block id="station-block" open collapsible>
+            <calcite-icon slot="icon" icon="urban" scale="s"></calcite-icon>
+            <span slot="header-content" id="station-block-title"></span>
+            <calcite-label id="station-block-subtitle" scale="s"></calcite-label>
+
+            <div id="station-address-block" style="display:none">
+              <calcite-label scale="s">
+                <strong>Address</strong>
+                <span id="station-address-text"></span>
+              </calcite-label>
+            </div>
+
+            <calcite-notice id="station-future-notice" open icon="information" scale="s" kind="info" style="margin-top:0.5rem">
+              <div slot="message">Detail queries (hydrants, drive miles, apparatus) — future task</div>
+            </calcite-notice>
+          </calcite-block>
+
+          <!-- Related assets block -->
+          <calcite-block id="related-block" open collapsible heading="Related Assets">
+            <calcite-icon slot="icon" icon="layers" scale="s"></calcite-icon>
+            <calcite-list>
+              <calcite-list-item label="Hydrant buffers" description="Display only — no stable key" non-interactive>
+                <calcite-icon slot="content-end" icon="information" scale="s"></calcite-icon>
+              </calcite-list-item>
+              <calcite-list-item label="Drive-mile polygons" description="Display only" non-interactive style="opacity:0.6">
+              </calcite-list-item>
+              <calcite-list-item label="Apparatus / CP feed" description="v2 scope" non-interactive style="opacity:0.4">
+              </calcite-list-item>
+            </calcite-list>
+            <calcite-notice open icon="information" scale="s" kind="warning" style="margin-top:0.5rem">
+              <div slot="message">Hydrant buffers regenerated monthly — no stable key available</div>
+            </calcite-notice>
+          </calcite-block>
+
+        </div>
+      </calcite-shell-panel>
+
+    </div>
   </div>
 
   <!-- Dev Log -->
@@ -215,9 +293,6 @@
   </div>
 
 <script type="module">
-// ─────────────────────────────────────────────────────────────────────────────
-// nanostores (set up by plain script before this module runs)
-// ─────────────────────────────────────────────────────────────────────────────
 const { atom, computed } = window.nanostores;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -228,12 +303,12 @@ const AGOL_PORTAL       = "https://wsrb.maps.arcgis.com/";
 const STATIONS_URL      = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Fire_Stations/FeatureServer/0";
 const DRIVE_MILE_URL    = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Drive_Mile_Disks/FeatureServer/1";
 const FPD_URL           = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/FPD_Boundaries/FeatureServer/0";
-const USERNAMES_ITEM_ID  = "a634dbad39de45ffb555381018c64892";
-const HYDRANT_BUF_URL    = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Hydrant_Buffers_1000_Feet/FeatureServer/2";
+const USERNAMES_ITEM_ID = "a634dbad39de45ffb555381018c64892";
+const HYDRANT_BUF_URL   = "https://services8.arcgis.com/e0kWqyF74glFc4lT/arcgis/rest/services/Hydrant_Buffers_1000_Feet/FeatureServer/2";
 const sqlQuote = s => `'${s.replace(/'/g, "''")}'`;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IMPORTS — $arcgis.import() replaces AMD require()
+// IMPORTS
 // ─────────────────────────────────────────────────────────────────────────────
 const [
   FeatureLayer,
@@ -276,14 +351,11 @@ function properCase(str) {
 // ─────────────────────────────────────────────────────────────────────────────
 // RENDERERS + LABEL CLASSES
 // ─────────────────────────────────────────────────────────────────────────────
-
-// FPD — very light dark-red fill, 1.5px outline (individual FPD boundaries)
 const FPD_RENDERER = {
   type:   "simple",
   symbol: { type: "simple-fill", color: [139, 0, 0, 0.06], outline: { color: [139, 0, 0], width: 1.5 } },
 };
 
-// FPD labels — Roboto bold, dark red
 const makeFPDLabelClass = (size = 10) => new LabelClass({
   labelExpressionInfo: { expression: `$feature.fpd_desc` },
   symbol: {
@@ -293,7 +365,6 @@ const makeFPDLabelClass = (size = 10) => new LabelClass({
   labelPlacement: "always-horizontal",
 });
 
-// Drive mile — unique-value by tobreak
 const DRIVE_MILE_RENDERER = {
   type: "unique-value",
   field: "tobreak",
@@ -305,13 +376,11 @@ const DRIVE_MILE_RENDERER = {
   ],
 };
 
-// Stations — web-style fire-station symbol
 const STATION_RENDERER = {
   type:   "simple",
   symbol: { type: "web-style", name: "fire-station", styleName: "Esri2DPointSymbolsStyle" },
 };
 
-// Station labels — Arial, offset above symbol; smaller for auto-aid
 const makeStationLabelClass = (size = 11) => new LabelClass({
   labelExpressionInfo: { expression: `$feature["StationName"]` },
   symbol: {
@@ -353,7 +422,6 @@ const $breadcrumb = computed([$agencyContext, $selection], (ctx, sel) => {
 async function resolveAgency(portalUsername) {
   log(`AgencyService: resolving "${portalUsername}"`, "state");
 
-  // Step 1: username → fire_prote
   const usernamesTable = new FeatureLayer({ portalItem: { id: USERNAMES_ITEM_ID } });
   const userResult = await usernamesTable.queryFeatures({
     where: `portal_user = '${portalUsername}'`,
@@ -364,7 +432,6 @@ async function resolveAgency(portalUsername) {
   const fire_prote = userResult.features[0].attributes["fire_prote"];
   log(`AgencyService: fire_prote = "${fire_prote}"`, "state");
 
-  // Step 2: fire_prote → FPD_CODEs + unioned geometry (for agency boundary)
   const fpdQueryLayer = new FeatureLayer({ url: FPD_URL });
   const fpdResult = await fpdQueryLayer.queryFeatures({
     where: `fire_prote = ${sqlQuote(fire_prote)}`,
@@ -376,7 +443,6 @@ async function resolveAgency(portalUsername) {
   const fpdCodes = fpdResult.features.map(f => f.attributes["FPD_CODE"]);
   log(`AgencyService: FPD_CODEs = [${fpdCodes.join(", ")}]`, "state");
 
-  // Union FPD geometries → single agency boundary polygon
   let agencyGeometry = null;
   try {
     const geometries = fpdResult.features.map(f => f.geometry);
@@ -388,14 +454,11 @@ async function resolveAgency(portalUsername) {
     log(`AgencyService: geometry union failed — ${e.message}`, "side");
   }
 
-  // Step 3: build definition expressions
   const inList           = fpdCodes.map(c => `'${c}'`).join(", ");
   const defExpression    = `DIST1 IN (${inList}) AND STNTYPE = 'A'`;
   const fpdDefExpression = `fire_prote = ${sqlQuote(fire_prote)}`;
-
-  // Auto-aid: stations whose DIST2-24 contain agency FPD codes but DIST1 does not
-  const distClause  = fpdCodes.length === 1 ? `= '${fpdCodes[0]}'` : `IN (${inList})`;
-  const autoAidExpr = `(${
+  const distClause       = fpdCodes.length === 1 ? `= '${fpdCodes[0]}'` : `IN (${inList})`;
+  const autoAidExpr      = `(${
     Array.from({ length: 23 }, (_, i) => `DIST${i + 2} ${distClause}`).join(" OR ")
   }) AND DIST1 NOT IN (${inList}) AND STNTYPE = 'A'`;
 
@@ -412,27 +475,40 @@ async function resolveAgency(portalUsername) {
 // MAP SERVICE
 // ─────────────────────────────────────────────────────────────────────────────
 const MapService = (() => {
-  let _view = null, _stationsLayer = null, _highlight = null;
+  let _view = null, _stationsLayer = null, _autoAidLayer = null, _highlight = null;
 
-  function init(view, stationsLayer) {
-    _view = view; _stationsLayer = stationsLayer;
+  function init(view, stationsLayer, autoAidLayer) {
+    _view = view; _stationsLayer = stationsLayer; _autoAidLayer = autoAidLayer;
 
     _view.on("click", async (event) => {
-      const hitResult = await _view.hitTest(event, { include: [_stationsLayer], tolerance: 6 });
-      const stationHit = hitResult.results.find(r => r.layer === _stationsLayer);
-      if (!stationHit) {
+      const hitResult = await _view.hitTest(event, {
+        include: [_stationsLayer, _autoAidLayer],
+        tolerance: 6,
+      });
+
+      // Explicit priority: primary station wins over auto-aid
+      const stationHit  = hitResult.results.find(r => r.layer === _stationsLayer);
+      const autoAidHit  = hitResult.results.find(r => r.layer === _autoAidLayer);
+      const hit         = stationHit || autoAidHit;
+      const hitLayer    = stationHit ? _stationsLayer : _autoAidLayer;
+
+      if (!hit) {
         if (!hitResult.results.length) SelectionService.clearSelection();
         return;
       }
-      const oidField = _stationsLayer.objectIdField || "OBJECTID";
-      const oid      = stationHit.graphic.attributes[oidField];
+
+      const oidField = hitLayer.objectIdField || "OBJECTID";
+      const oid      = hit.graphic.attributes[oidField];
       try {
-        const result = await _stationsLayer.queryFeatures({
-          objectIds: [oid], outFields: ["Station", "StationName", "FIRE_DISTRICT", "StationAddress"], returnGeometry: false,
+        const result = await hitLayer.queryFeatures({
+          objectIds: [oid],
+          outFields: ["Station", "StationName", "FIRE_DISTRICT", "StationAddress"],
+          returnGeometry: false,
         });
         const attrs     = result.features[0]?.attributes;
         const stationId = attrs?.["Station"];
-        log(`hit: Station="${stationId}"`, "action");
+        const source    = stationHit ? "map" : "map-autoaid";
+        log(`hit: Station="${stationId}" (${stationHit ? "primary" : "auto-aid"})`, "action");
         SelectionService.selectStation(stationId, "map", {
           label:    attrs?.["StationName"] || stationId,
           district: attrs?.["FIRE_DISTRICT"] || "",
@@ -447,7 +523,9 @@ const MapService = (() => {
   async function goToStation(stationId) {
     if (!_view || !_stationsLayer) return;
     try {
-      const r = await _stationsLayer.queryFeatures({ where: `Station = '${stationId}'`, returnGeometry: true, outFields: ["Station"] });
+      const r = await _stationsLayer.queryFeatures({
+        where: `Station = '${stationId}'`, returnGeometry: true, outFields: ["Station"],
+      });
       if (r.features.length) await _view.goTo({ target: r.features[0].geometry, zoom: 14 });
     } catch(e) { log(`goTo failed: ${e.message}`, "side"); }
   }
@@ -457,7 +535,9 @@ const MapService = (() => {
     clearHighlight();
     try {
       const lv = await _view.whenLayerView(_stationsLayer);
-      const r  = await _stationsLayer.queryFeatures({ where: `Station = '${stationId}'`, returnGeometry: false, outFields: ["OBJECTID"] });
+      const r  = await _stationsLayer.queryFeatures({
+        where: `Station = '${stationId}'`, returnGeometry: false, outFields: ["OBJECTID"],
+      });
       if (r.features.length) _highlight = lv.highlight(r.features);
     } catch(e) { log(`highlight failed: ${e.message}`, "side"); }
   }
@@ -472,7 +552,12 @@ const MapService = (() => {
 const SelectionService = {
   selectStation(stationId, source = "map", display = {}) {
     log(`selectStation("${stationId}", source="${source}")`, "action");
-    $selection.set({ stationId, label: display.label || stationId, district: display.district || "", address: display.address || "" });
+    $selection.set({
+      stationId,
+      label:    display.label    || stationId,
+      district: display.district || "",
+      address:  display.address  || "",
+    });
     MapService.highlightStation(stationId);
     if (source === "search" || source === "list") MapService.goToStation(stationId);
   },
@@ -483,12 +568,6 @@ const SelectionService = {
   },
 };
 window.SelectionService = SelectionService;
-window.handleStationClick = (el) => {
-  SelectionService.selectStation(
-    el.dataset.id, "list",
-    { label: el.dataset.label, district: el.dataset.district, address: el.dataset.address }
-  );
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STATION SERVICE
@@ -497,10 +576,7 @@ const StationService = (() => {
   let _layer = null, _autoAidLayer = null;
   let _stations = [], _autoAidStations = [];
 
-  function init(layer, autoAidLayer) {
-    _layer = layer;
-    _autoAidLayer = autoAidLayer;
-  }
+  function init(layer, autoAidLayer) { _layer = layer; _autoAidLayer = autoAidLayer; }
 
   async function loadAgencyStations(expr, autoAidExpr) {
     try {
@@ -518,7 +594,7 @@ const StationService = (() => {
           address:   f.attributes["StationAddress"] || "",
         }))
         .filter(s => { if (seen.has(s.stationId)) return false; seen.add(s.stationId); return true; });
-      log(`StationService: ${_stations.length} primary stations loaded (deduped)`, "state");
+      log(`StationService: ${_stations.length} primary stations loaded`, "state");
     } catch(e) { log(`StationService primary failed: ${e.message}`, "side"); }
 
     try {
@@ -536,16 +612,16 @@ const StationService = (() => {
           address:   f.attributes["StationAddress"] || "",
         }))
         .filter(s => { if (seen2.has(s.stationId)) return false; seen2.add(s.stationId); return true; });
-      log(`StationService: ${_autoAidStations.length} auto-aid stations loaded (deduped)`, "state");
+      log(`StationService: ${_autoAidStations.length} auto-aid stations loaded`, "state");
     } catch(e) { log(`StationService auto-aid failed: ${e.message}`, "side"); }
   }
 
-  async function loadSnapshot() {
+  function loadSnapshot() {
     $agencySnapshot.set({
-      stationCount:  _stations.length,
-      autoAidCount:  _autoAidStations.length,
+      stationCount: _stations.length,
+      autoAidCount: _autoAidStations.length,
     });
-    log(`StationService: snapshot set (${_stations.length} primary, ${_autoAidStations.length} auto-aid, deduped)`, "state");
+    log(`StationService: snapshot set (${_stations.length} primary, ${_autoAidStations.length} auto-aid)`, "state");
   }
 
   function getStations()        { return _stations; }
@@ -554,142 +630,130 @@ const StationService = (() => {
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RENDERING
+// DOM HELPERS — build Calcite components programmatically
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Populate a calcite-list with station items */
+function populateStationList(listEl, stations) {
+  listEl.innerHTML = "";
+  stations.forEach(s => {
+    const item = document.createElement("calcite-list-item");
+    item.setAttribute("label", s.label);
+    item.setAttribute("description", s.district);
+    item.dataset.id       = s.stationId;
+    item.dataset.label    = s.label;
+    item.dataset.district = s.district;
+    item.dataset.address  = s.address;
+    item.addEventListener("calciteListItemSelect", () => {
+      SelectionService.selectStation(s.stationId, "list", {
+        label: s.label, district: s.district, address: s.address,
+      });
+    });
+    listEl.appendChild(item);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RENDERING — update DOM properties, never innerHTML on Calcite components
+// ─────────────────────────────────────────────────────────────────────────────
+
 function renderRibbon() {
   const ribbon = document.getElementById("ribbon");
   const crumbs = $breadcrumb.get();
   const mode   = $mode.get();
   const badge  = `<span class="mode-badge ${mode}">${mode === "home" ? "HOME" : "STATION"}</span>`;
-  if (!crumbs.length) { ribbon.innerHTML = `<span style="color:var(--fph-text-muted);font-size:0.75rem">Authenticating…</span>${badge}`; return; }
+  if (!crumbs.length) {
+    ribbon.innerHTML = `<span style="color:var(--calcite-color-text-3);font-size:0.75rem">Authenticating…</span>${badge}`;
+    return;
+  }
   const parts = crumbs.map((c, i) => {
     const sep    = i > 0 ? `<span class="ribbon-sep">›</span>` : "";
     const isLast = i === crumbs.length - 1;
-    if (isLast || !c.action) return `${sep}<span class="ribbon-crumb"><button class="active" disabled>${c.label}</button></span>`;
+    if (isLast || !c.action)
+      return `${sep}<span class="ribbon-crumb"><button class="active" disabled>${c.label}</button></span>`;
     return `${sep}<span class="ribbon-crumb"><button onclick="SelectionService.clearSelection()">${c.label}</button></span>`;
   }).join("");
   ribbon.innerHTML = parts + badge;
 }
 
-function renderCardStack() {
-  const right = document.getElementById("right-panel");
-  const mode  = $mode.get();
-  const ctx   = $agencyContext.get();
-  const snap  = $agencySnapshot.get();
-  const sel   = $selection.get();
+function renderHomeView(ctx, snap) {
+  // Agency block header
+  document.getElementById("agency-block-title").textContent    = ctx.agencyName;
+  document.getElementById("agency-block-subtitle").textContent = ctx.portalUsername;
 
-  if (!ctx) { right.innerHTML = `<div style="padding:1rem;font-size:0.8rem;color:var(--fph-text-muted)">Authenticating…</div>`; return; }
+  // Count tiles
+  if (snap) {
+    document.getElementById("tile-stations").setAttribute("heading", String(snap.stationCount));
+    document.getElementById("tile-autoaid").setAttribute("heading",  String(snap.autoAidCount ?? "—"));
+  }
+
+  // Station lists
+  populateStationList(
+    document.getElementById("stations-list"),
+    StationService.getStations()
+  );
+  populateStationList(
+    document.getElementById("autoaid-list"),
+    StationService.getAutoAidStations()
+  );
+
+  // Show/hide auto-aid block based on whether there are any
+  const autoAidBlock = document.getElementById("autoaid-block");
+  autoAidBlock.hidden = StationService.getAutoAidStations().length === 0;
+}
+
+function renderStationView(sel) {
+  const agencyBlock = document.getElementById("agency-collapsed-block");
+  const ctx = $agencyContext.get();
+  if (ctx) {
+    document.getElementById("agency-collapsed-title").textContent = ctx.agencyName;
+    agencyBlock.open = false;
+  }
+
+  document.getElementById("station-block-title").textContent    = sel.label || sel.stationId;
+  document.getElementById("station-block-subtitle").textContent = sel.district || "";
+
+  const addrBlock = document.getElementById("station-address-block");
+  const addrText  = document.getElementById("station-address-text");
+  if (sel.address) {
+    addrText.textContent = properCase(sel.address);
+    addrBlock.style.display = "";
+  } else {
+    addrBlock.style.display = "none";
+  }
+
+  // Update related assets subtitle
+  document.getElementById("related-block").setAttribute("description", `for ${sel.label || sel.stationId}`);
+}
+
+function renderCardStack() {
+  const ctx  = $agencyContext.get();
+  const snap = $agencySnapshot.get();
+  const sel  = $selection.get();
+  const mode = $mode.get();
+
+  const homeView    = document.getElementById("home-view");
+  const stationView = document.getElementById("station-view");
+
+  if (!ctx) return;  // still authenticating — views stay hidden
 
   if (mode === "home") {
-    right.innerHTML = agencyCardExpanded(ctx, snap);
+    homeView.hidden    = false;
+    stationView.hidden = true;
+    renderHomeView(ctx, snap);
   } else {
-    const station = { stationId: sel.stationId, label: sel.label || sel.stationId, district: sel.district || "", address: sel.address || "" };
-    right.innerHTML = agencyCardCollapsed(ctx) + stationCard(station) + relatedAssetsList(station);
+    homeView.hidden    = true;
+    stationView.hidden = false;
+    renderStationView(sel);
   }
 }
 
-function agencyCardExpanded(ctx, snap) {
-  const stations     = StationService.getStations();
-  const autoAid      = StationService.getAutoAidStations();
-
-  const stationList = (list, section) => !list.length ? "" : `
-    <div class="section-label" style="margin-top:0.9rem">${section}</div>
-    <ul class="asset-list">
-      ${list.map(s => `
-        <li class="asset-item" style="cursor:pointer"
-            data-id="${s.stationId}"
-            data-label="${s.label.replace(/"/g, '&quot;')}"
-            data-district="${s.district.replace(/"/g, '&quot;')}"
-            data-address="${s.address.replace(/"/g, '&quot;')}"
-            onclick="handleStationClick(this)">
-          <span class="ai-name">${s.label}</span>
-          <span class="ai-count" style="font-size:0.65rem">${s.district}</span>
-        </li>`).join("")}
-    </ul>`;
-
-  return `
-    <div class="card expanded">
-      <div class="card-header">
-        <div class="card-icon icon-agency">🏛️</div>
-        <div class="card-title-group">
-          <div class="card-title">${ctx.agencyName}</div>
-          <div class="card-subtitle">${ctx.portalUsername}</div>
-        </div>
-      </div>
-      <div class="card-body">
-        ${snap ? `
-        <div class="data-grid" style="margin-top:0.5rem">
-          <div class="data-item">
-            <div class="di-val">${snap.stationCount}</div>
-            <div class="di-label">Agency Stations</div>
-          </div>
-          <div class="data-item">
-            <div class="di-val">${snap.autoAidCount ?? "—"}</div>
-            <div class="di-label">Auto Aid Stations</div>
-          </div>
-        </div>` : `<p style="font-size:0.75rem;color:var(--fph-text-muted);margin-top:0.5rem">Loading data…</p>`}
-        ${stationList(stations, "Stations")}
-        ${stationList(autoAid, "Auto Aid Stations")}
-      </div>
-    </div>`;
-}
-
-function agencyCardCollapsed(ctx) {
-  return `
-    <div class="card collapsed-strip">
-      <div class="card-header" onclick="SelectionService.clearSelection()">
-        <div class="card-icon icon-agency">🏛️</div>
-        <div class="card-title-group"><div class="card-title">${ctx.agencyName}</div></div>
-        <span style="font-size:0.65rem;color:var(--fph-text-muted)">↩ home</span>
-      </div>
-    </div>`;
-}
-
-function stationCard(station) {
-  return `
-    <div class="card expanded">
-      <div class="card-header">
-        <div class="card-icon icon-station">🚒</div>
-        <div class="card-title-group">
-          <div class="card-title">${station.label}</div>
-          <div class="card-subtitle">${station.district}</div>
-        </div>
-      </div>
-      <div class="card-body">
-        ${station.address ? `
-        <div class="data-item" style="margin-top:0.5rem">
-          <div class="di-label">Address</div>
-          <div style="font-size:0.78rem;color:var(--fph-text);margin-top:0.2rem">${properCase(station.address)}</div>
-        </div>` : ""}
-        <p style="font-size:0.65rem;color:var(--fph-text-muted);margin-top:0.75rem">
-          Detail queries (hydrants, drive miles, apparatus) — future task
-        </p>
-      </div>
-    </div>`;
-}
-
-function relatedAssetsList(station) {
-  return `
-    <div class="card expanded">
-      <div class="card-header">
-        <div class="card-icon icon-assets">⬡</div>
-        <div class="card-title-group">
-          <div class="card-title">Related Assets</div>
-          <div class="card-subtitle">for ${station.label}</div>
-        </div>
-      </div>
-      <div class="card-body">
-        <ul class="asset-list">
-          <li class="asset-item"><span class="ai-name">Hydrant buffers</span><span class="ai-count">—</span></li>
-          <li class="asset-item" style="opacity:0.55"><span class="ai-name">Drive-mile polygons</span><span class="ai-count">—</span></li>
-          <li class="asset-item" style="opacity:0.35"><span class="ai-name">Apparatus / CP feed</span><span class="ai-count" style="color:#6450b4">v2 scope</span></li>
-        </ul>
-        <p style="font-size:0.62rem;color:var(--fph-text-muted);margin-top:0.6rem">
-          Hydrant buffers: display-only — no stable key (regenerated monthly)
-        </p>
-      </div>
-    </div>`;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// EVENT WIRING — Calcite action / button events
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById("back-to-agency-btn").addEventListener("click", () => {
+  SelectionService.clearSelection();
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DEV LOG
@@ -701,8 +765,11 @@ function log(msg, type = "") {
   d.className = `log-entry ${type}`; d.textContent = `${ts}  ${msg}`;
   el.prepend(d);
 }
-window.toggleLog = () => { const b = document.getElementById("log-body"); b.style.display = b.style.display === "none" ? "" : "none"; };
-window.clearLog  = () => { document.getElementById("log-body").innerHTML = ""; };
+window.toggleLog = () => {
+  const b = document.getElementById("log-body");
+  b.style.display = b.style.display === "none" ? "" : "none";
+};
+window.clearLog = () => { document.getElementById("log-body").innerHTML = ""; };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SUBSCRIPTIONS
@@ -715,87 +782,57 @@ $agencyContext.subscribe(renderCardStack);
 // BOOT
 // ─────────────────────────────────────────────────────────────────────────────
 renderRibbon();
-renderCardStack();
 
-// ── Layers (1=2 until login resolves — prevents statewide flash) ──────────
-const agencyBoundaryLayer = new GraphicsLayer({
-  title:    "Agency Boundary",
-  listMode: "show",
-});
+const agencyBoundaryLayer = new GraphicsLayer({ title: "Agency Boundary", listMode: "show" });
 
 const fpdLayer = new FeatureLayer({
-  url:                  FPD_URL,
-  title:                "FPD Boundaries",
+  url: FPD_URL, title: "FPD Boundaries",
   definitionExpression: "1=2",
-  outFields:            ["FPD_CODE", "fire_prote", "fpd_desc"],
-  labelsVisible:        true,
-  labelingInfo:         [makeFPDLabelClass(12)],
-  renderer:             FPD_RENDERER,
-  popupEnabled:         false,
+  outFields: ["FPD_CODE", "fire_prote", "fpd_desc"],
+  labelsVisible: true, labelingInfo: [makeFPDLabelClass(10)],
+  renderer: FPD_RENDERER, popupEnabled: false,
 });
 
 const stationsLayer = new FeatureLayer({
-  url:                  STATIONS_URL,
-  title:                "Fire Stations",
+  url: STATIONS_URL, title: "Fire Stations",
   definitionExpression: "1=2",
-  outFields:            ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
-  labelsVisible:        true,
-  labelingInfo:         [makeStationLabelClass(11)],
-  renderer:             STATION_RENDERER,
-  popupEnabled:         false,
+  outFields: ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
+  labelsVisible: true, labelingInfo: [makeStationLabelClass(11)],
+  renderer: STATION_RENDERER, popupEnabled: false,
 });
 
 const autoAidLayer = new FeatureLayer({
-  url:                  STATIONS_URL,
-  title:                "Auto Aid Stations",
+  url: STATIONS_URL, title: "Auto Aid Stations",
   definitionExpression: "1=2",
-  outFields:            ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
-  labelsVisible:        true,
-  labelingInfo:         [makeStationLabelClass(9)],
-  opacity:              0.5,
-  renderer:             STATION_RENDERER,
-  popupEnabled:         false,
+  outFields: ["Station", "StationName", "DIST1", "FIRE_DISTRICT"],
+  labelsVisible: true, labelingInfo: [makeStationLabelClass(9)],
+  opacity: 0.5, renderer: STATION_RENDERER, popupEnabled: false,
 });
 
 const hydrantBufLayer = new FeatureLayer({
-  url:          HYDRANT_BUF_URL,
-  title:        "Hydrant Buffers (1000 ft)",
-  visible:      false,
-  minScale:     150000,
-  opacity:      0.32,
-  popupEnabled: false,
+  url: HYDRANT_BUF_URL, title: "Hydrant Buffers (1000 ft)",
+  visible: false, minScale: 150000, opacity: 0.32, popupEnabled: false,
   renderer: {
-    type:   "simple",
-    symbol: {
-      type:    "simple-fill",
-      color:   [197, 225, 240],
-      outline: { color: [0, 40, 100], width: 2 },
-    },
+    type: "simple",
+    symbol: { type: "simple-fill", color: [197, 225, 240], outline: { color: [0, 40, 100], width: 2 } },
   },
 });
 
 const driveMiLayer = new FeatureLayer({
-  url:                  DRIVE_MILE_URL,
-  title:                "Drive Mile Coverage",
+  url: DRIVE_MILE_URL, title: "Drive Mile Coverage",
   definitionExpression: "1=2",
-  outFields:            ["Station", "DIST1", "tobreak"],
-  opacity:              0.5,
-  renderer:             DRIVE_MILE_RENDERER,
-  popupEnabled:         false,
+  outFields: ["Station", "DIST1", "tobreak"],
+  opacity: 0.5, renderer: DRIVE_MILE_RENDERER, popupEnabled: false,
 });
 
-// ── Wire map via arcgis-map web component event ───────────────────────────
 const mapEl = document.getElementById("the-map");
 
 mapEl.addEventListener("arcgisViewReadyChange", async () => {
   const view = mapEl.view;
-
-  // Layer draw order (bottom → top): hydrant buffers, drive miles, FPD, agency boundary, auto-aid, stations
   view.map.addMany([hydrantBufLayer, driveMiLayer, fpdLayer, agencyBoundaryLayer, autoAidLayer, stationsLayer]);
 
-  MapService.init(view, stationsLayer);
+  MapService.init(view, stationsLayer, autoAidLayer);
   StationService.init(stationsLayer, autoAidLayer);
-
   log("View ready", "state");
 
   try {
@@ -807,45 +844,31 @@ mapEl.addEventListener("arcgisViewReadyChange", async () => {
 
     const ctx = await resolveAgency(portalUsername);
 
-    // Apply definition expressions
-    fpdLayer.definitionExpression         = ctx.fpdDefExpression;
-    stationsLayer.definitionExpression    = ctx.defExpression;
-    autoAidLayer.definitionExpression     = ctx.autoAidExpr;
-    driveMiLayer.definitionExpression     = ctx.defExpression;
+    fpdLayer.definitionExpression      = ctx.fpdDefExpression;
+    stationsLayer.definitionExpression = ctx.defExpression;
+    autoAidLayer.definitionExpression  = ctx.autoAidExpr;
+    driveMiLayer.definitionExpression  = ctx.defExpression;
 
-    // Hydrant buffers — spatial filter using agency boundary geometry
-    // No field-based filter available; geometry intersection scopes to agency area
     if (ctx.agencyGeometry) {
       hydrantBufLayer.geometryDefinition = ctx.agencyGeometry;
-    }
-
-    // Draw agency boundary (thick dark-red outline, no fill — Option B)
-    if (ctx.agencyGeometry) {
       agencyBoundaryLayer.add(new Graphic({
         geometry: ctx.agencyGeometry,
         symbol: { type: "simple-fill", color: [0, 0, 0, 0], outline: { color: [139, 0, 0, 200], width: 2.5 } },
       }));
     }
 
-    // Zoom to agency extent
     const extentResult = await stationsLayer.queryExtent({ where: ctx.defExpression });
     if (extentResult.extent) await view.goTo(extentResult.extent.expand(1.5));
 
-    // Load station list + snapshot first, then set context atom
-    // This ensures the single render triggered by $agencyContext.set has full data
     await StationService.loadAgencyStations(ctx.defExpression, ctx.autoAidExpr);
-    await StationService.loadSnapshot();
+    StationService.loadSnapshot();
 
-    // Set context atom → triggers ribbon + card stack render (with full station data)
     $agencyContext.set(ctx);
     log(`$agencyContext set for "${ctx.agencyName}"`, "state");
-
     log("App ready", "state");
 
   } catch(e) {
     log(`Login failed: ${e.message}`, "side");
-    document.getElementById("right-panel").innerHTML =
-      `<div style="padding:1rem;font-size:0.8rem;color:var(--fph-text-muted)">Login failed: ${e.message}</div>`;
   }
 });
 </script>
