@@ -100,13 +100,6 @@
     #map-area { flex: 1; position: relative; overflow: hidden; }
     arcgis-map { width: 100%; height: 100%; }
 
-    /* ── Calcite shell panel overrides ───────────────────────────── */
-    #right-shell-panel {
-      --calcite-shell-panel-width: 340px;
-      display: flex;
-      flex-direction: column;
-    }
-
     /* ── Calcite block styling ───────────────────────────────────── */
     calcite-block {
       margin: 0;
@@ -182,8 +175,8 @@
         </arcgis-map>
       </main>
 
-      <!-- Right Panel — Calcite shell panel with declarative block structure -->
-      <calcite-shell-panel id="right-shell-panel" slot="panel-end" position="end" display-mode="float-content">
+      <!-- Right Panel — plain aside; Calcite components work without calcite-shell wrapper -->
+      <aside id="right-panel" style="width:340px;background:var(--calcite-color-foreground-1,#fff);border-left:1px solid var(--calcite-color-border-3,rgba(0,0,0,0.12));overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column">
 
         <!-- ── HOME VIEW ─────────────────────────────────────────── -->
         <div id="home-view">
@@ -294,7 +287,7 @@
           <div id="log-body"></div>
         </div>
 
-      </calcite-shell-panel>
+      </aside>
 
     </div>
   </div>
